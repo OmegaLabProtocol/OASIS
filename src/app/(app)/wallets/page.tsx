@@ -1,10 +1,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MOCK_WALLETS, WALLET_ALERTS } from "@/data/wallets";
+import { DataConfidenceBadge } from "@/components/DataConfidenceBadge";
 import { WalletActivityFeed } from "@/components/WalletActivityFeed";
+import { WALLET_ALERTS } from "@/data/wallets";
 import { formatNumber } from "@/lib/utils";
+import { getLiveWallets } from "@/services/dataService";
 
-export default function WalletsPage() {
+export default async function WalletsPage() {
+  const { wallets, confidence, note } = await getLiveWallets();
+
   return (
     <div className="space-y-6">
       <div>
@@ -15,16 +19,17 @@ export default function WalletsPage() {
         </p>
       </div>
 
+      <DataConfidenceBadge confidence={confidence} />
+      {note && (
+        <p className="text-xs text-muted-foreground border-l-2 border-border pl-3">{note}</p>
+      )}
+
       <div className="grid gap-3 sm:grid-cols-2">
         {WALLET_ALERTS.map((a) => (
           <Card key={a.title}>
             <CardContent className="pt-4">
               <div className="flex items-center gap-2 mb-1">
-                <Badge
-                  variant={
-                    a.severity === "High" ? "warning" : "default"
-                  }
-                >
+                <Badge variant={a.severity === "High" ? "warning" : "default"}>
                   {a.severity}
                 </Badge>
                 <span className="text-xs font-medium">{a.asset}</span>
@@ -36,7 +41,7 @@ export default function WalletsPage() {
         ))}
       </div>
 
-      <WalletActivityFeed wallets={MOCK_WALLETS} />
+      <WalletActivityFeed wallets={wallets} />
 
       <Card>
         <CardHeader>
@@ -57,7 +62,7 @@ export default function WalletsPage() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_WALLETS.map((w) => (
+              {wallets.map((w) => (
                 <tr key={w.id} className="border-b border-border/50">
                   <td className="py-2 pr-4 font-medium">{w.label}</td>
                   <td className="py-2 pr-4">

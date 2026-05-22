@@ -1,9 +1,12 @@
 import { AlertCard } from "@/components/AlertCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MOCK_ALERTS } from "@/data/alerts";
+import { DataConfidenceBadge } from "@/components/DataConfidenceBadge";
+import { getLiveAlerts } from "@/services/dataService";
 import { AlertsClient } from "./AlertsClient";
 
-export default function AlertsPage() {
+export default async function AlertsPage() {
+  const { alerts, confidence, note } = await getLiveAlerts();
+
   return (
     <div className="space-y-6">
       <div>
@@ -13,7 +16,12 @@ export default function AlertsPage() {
         </p>
       </div>
 
-      <AlertsClient initialAlerts={MOCK_ALERTS} />
+      <DataConfidenceBadge confidence={confidence} />
+      {note && (
+        <p className="text-xs text-muted-foreground border-l-2 border-border pl-3">{note}</p>
+      )}
+
+      <AlertsClient initialAlerts={alerts} />
 
       <Card>
         <CardHeader>
@@ -22,7 +30,7 @@ export default function AlertsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2">
-          {MOCK_ALERTS.map((a) => (
+          {alerts.map((a) => (
             <AlertCard key={a.id} alert={a} />
           ))}
         </CardContent>

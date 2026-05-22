@@ -1,9 +1,14 @@
 import { ProtocolHealthCard } from "@/components/ProtocolHealthCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MOCK_PROTOCOLS } from "@/data/protocols";
+import { DataConfidenceBadge } from "@/components/DataConfidenceBadge";
 import { formatNumber } from "@/lib/utils";
+import { getLiveProtocols } from "@/services/dataService";
 
-export default function ProtocolsPage() {
+export const revalidate = 600;
+
+export default async function ProtocolsPage() {
+  const { protocols, confidence } = await getLiveProtocols();
+
   return (
     <div className="space-y-6">
       <div>
@@ -13,8 +18,10 @@ export default function ProtocolsPage() {
         </p>
       </div>
 
+      <DataConfidenceBadge confidence={confidence} />
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {MOCK_PROTOCOLS.map((p) => (
+        {protocols.map((p) => (
           <ProtocolHealthCard key={p.id} protocol={p} />
         ))}
       </div>
@@ -30,7 +37,7 @@ export default function ProtocolsPage() {
             <thead>
               <tr className="border-b border-border text-muted-foreground text-left">
                 <th className="pb-2 pr-4">Protocol</th>
-                <th className="pb-2 pr-4">TVL</th>
+                <th className="pb-2 pr-4">TVL (Live)</th>
                 <th className="pb-2 pr-4">Revenue (30d)</th>
                 <th className="pb-2 pr-4">Rev. Sustainability</th>
                 <th className="pb-2 pr-4">Treasury Runway</th>
@@ -39,7 +46,7 @@ export default function ProtocolsPage() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_PROTOCOLS.map((p) => (
+              {protocols.map((p) => (
                 <tr key={p.id} className="border-b border-border/50">
                   <td className="py-2 pr-4 font-medium">{p.name}</td>
                   <td className="py-2 pr-4 font-mono">${formatNumber(p.tvl)}</td>
@@ -59,8 +66,7 @@ export default function ProtocolsPage() {
 
       <Card>
         <CardContent className="pt-5 text-sm text-muted-foreground space-y-1">
-          <p>Revenue Sustainability = Protocol Revenue / Token Incentives Paid</p>
-          <p>Treasury Runway = Treasury Assets / Monthly Burn</p>
+          <p>TVL and 30d revenue from DefiLlama. Treasury, governance, and runway metrics use institutional estimates.</p>
         </CardContent>
       </Card>
     </div>

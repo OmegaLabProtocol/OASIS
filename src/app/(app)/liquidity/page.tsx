@@ -1,16 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MOCK_LIQUIDITY } from "@/data/liquidity";
 import { formatNumber } from "@/lib/utils";
 import { DataConfidenceBadge } from "@/components/DataConfidenceBadge";
+import { getLiveLiquidity } from "@/services/dataService";
 import Link from "next/link";
 
-export default function LiquidityPage() {
-  const confidence = {
-    sourceType: "Mock" as const,
-    lastUpdated: new Date().toISOString(),
-    confidence: "High" as const,
-    freshnessMinutes: 10,
-  };
+export const revalidate = 300;
+
+export default async function LiquidityPage() {
+  const { assets, confidence } = await getLiveLiquidity();
 
   return (
     <div className="space-y-6">
@@ -24,7 +21,7 @@ export default function LiquidityPage() {
       <DataConfidenceBadge confidence={confidence} />
 
       <div className="grid gap-4">
-        {MOCK_LIQUIDITY.map((asset) => (
+        {assets.map((asset) => (
           <Card key={asset.symbol}>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
@@ -77,9 +74,7 @@ export default function LiquidityPage() {
                   >
                     <p className="text-xs text-muted-foreground">{s.size} Trade</p>
                     <p className="text-2xl font-mono font-light mt-1">{s.slippage}%</p>
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      Est. Slippage
-                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-1">Est. Slippage</p>
                   </div>
                 ))}
               </div>
@@ -96,8 +91,7 @@ export default function LiquidityPage() {
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground space-y-1">
           <p>Liquidity Stability = 50% × Slippage Score + 30% × Depth Score + 20% × LP Distribution Score</p>
-          <p>Slippage % = (Expected Price − Executed Price) / Expected Price × 100</p>
-          <p>Volume/Liquidity Ratio = 24h Volume / Total Liquidity</p>
+          <p>Volume and depth from CoinGecko + DefiLlama chain TVL; slippage estimated from market structure models.</p>
         </CardContent>
       </Card>
     </div>

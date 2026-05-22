@@ -1,6 +1,13 @@
-import { mockData } from "@/services/mockData";
+import { getLiveProtocols } from "@/services/dataService";
 import { NextResponse } from "next/server";
 
+export const revalidate = 600;
+
 export async function GET() {
-  return NextResponse.json(mockData.getProtocols());
+  try {
+    return NextResponse.json(await getLiveProtocols());
+  } catch {
+    const { mockData } = await import("@/services/mockData");
+    return NextResponse.json(mockData.getProtocols());
+  }
 }

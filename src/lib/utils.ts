@@ -13,8 +13,10 @@ export function formatNumber(n: number, decimals = 2): string {
 }
 
 export function formatPercent(n: number, decimals = 1): string {
-  const sign = n > 0 ? "+" : "";
-  return `${sign}${n.toFixed(decimals)}%`;
+  const val = Number(n);
+  if (Number.isNaN(val)) return "—";
+  const sign = val > 0 ? "+" : "";
+  return `${sign}${val.toFixed(decimals)}%`;
 }
 
 export function formatTimestamp(date: Date | string): string {

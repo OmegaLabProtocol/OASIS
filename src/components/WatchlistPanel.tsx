@@ -1,16 +1,27 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RiskBadge } from "@/components/RiskBadge";
 import { useWatchlist } from "@/components/providers/watchlist-provider";
-import { getTokenMetrics } from "@/lib/tokenData";
+import type { OriMetrics } from "@/lib/types";
 import { formatPercent } from "@/lib/utils";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function WatchlistPanel() {
   const { watchlist, removeFromWatchlist } = useWatchlist();
+  const [tokens, setTokens] = useState<OriMetrics[]>([]);
+
+  useEffect(() => {
+    fetch("/api/tokens")
+      .then((r) => r.json())
+      .then((d) => setTokens(d.tokens ?? []))
+      .catch(() => setTokens([]));
+  }, []);
+
+  const tokenMap = Object.fromEntries(tokens.map((t) => [t.symbol, t]));
 
   return (
     <Card>
@@ -24,8 +35,14 @@ export function WatchlistPanel() {
           <p className="text-xs text-muted-foreground">No assets in watchlist</p>
         ) : (
           watchlist.map((symbol) => {
-            const token = getTokenMetrics(symbol);
-            if (!token) return null;
+            const token = tokenMap[symbol];
+            if (!token) {
+              return (
+                <div key={symbol} className="text-xs text-muted-foreground p-2">
+                  Loading {symbol}…
+                </div>
+              );
+            }
             return (
               <div
                 key={symbol}

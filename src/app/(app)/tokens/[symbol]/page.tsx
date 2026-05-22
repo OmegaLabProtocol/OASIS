@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getTokenDetail } from "@/lib/tokenData";
 import { TOKEN_SYMBOLS } from "@/lib/constants";
 import { ScoreGauge } from "@/components/ScoreGauge";
 import { RiskBadge } from "@/components/RiskBadge";
@@ -15,7 +14,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { COMPONENT_LABELS } from "@/lib/scoring";
 import type { OriComponentScores } from "@/lib/types";
 import { formatNumber } from "@/lib/utils";
+import { getLiveTokenDetail } from "@/services/dataService";
 import { ArrowLeft } from "lucide-react";
+
+export const revalidate = 300;
 
 export function generateStaticParams() {
   return TOKEN_SYMBOLS.map((symbol) => ({ symbol }));
@@ -27,7 +29,7 @@ export default async function TokenPage({
   params: Promise<{ symbol: string }>;
 }) {
   const { symbol } = await params;
-  const detail = getTokenDetail(symbol);
+  const detail = await getLiveTokenDetail(symbol);
 
   if (!detail) notFound();
 
@@ -158,11 +160,11 @@ export default async function TokenPage({
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Vol/Liq Ratio</span>
-              <span className="font-mono">{raw.volumeLiquidityRatio}</span>
+              <span className="font-mono">{raw.volumeLiquidityRatio.toFixed(2)}</span>
             </div>
             {raw.priceUsd && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Price</span>
+                <span className="text-muted-foreground">Price (Live)</span>
                 <span className="font-mono">${raw.priceUsd.toLocaleString()}</span>
               </div>
             )}

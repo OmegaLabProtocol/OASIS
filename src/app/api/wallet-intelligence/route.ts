@@ -1,6 +1,6 @@
-import { mockData } from "@/services/mockData";
+import { getLiveWallets } from "@/services/dataService";
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  return NextResponse.json(mockData.getWallets());
+  return NextResponse.json(await getLiveWallets());
 }

@@ -5,18 +5,27 @@ import { AIInsightCard } from "@/components/AIInsightCard";
 import { WatchlistPanel } from "@/components/WatchlistPanel";
 import { WalletActivityFeed } from "@/components/WalletActivityFeed";
 import { ProtocolHealthCard } from "@/components/ProtocolHealthCard";
+import { DataConfidenceBadge } from "@/components/DataConfidenceBadge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { getMarketOverview } from "@/lib/tokenData";
-import { MOCK_ALERTS } from "@/data/alerts";
-import { MOCK_WALLETS } from "@/data/wallets";
-import { MOCK_PROTOCOLS } from "@/data/protocols";
 import { ORI_BENCHMARK_COPY } from "@/lib/constants";
 import { cn, formatPercent } from "@/lib/utils";
+import {
+  getLiveMarketOverview,
+  getLiveProtocols,
+  getLiveWallets,
+} from "@/services/dataService";
 import Link from "next/link";
 
-export default function DashboardPage() {
-  const market = getMarketOverview();
+export const revalidate = 300;
+
+export default async function DashboardPage() {
+  const [market, protocols, wallets] = await Promise.all([
+    getLiveMarketOverview(),
+    getLiveProtocols(),
+    getLiveWallets(),
+  ]);
+
   const sortedByChange = [...market.tokens].sort(
     (a, b) => Math.abs(b.change24h) - Math.abs(a.change24h)
   );
@@ -29,6 +38,8 @@ export default function DashboardPage() {
           What changed in the market that requires your attention today?
         </p>
       </div>
+
+      <DataConfidenceBadge confidence={market.confidence} />
 
       <p className="text-xs text-muted-foreground border-l-2 border-border pl-3 max-w-2xl">
         {ORI_BENCHMARK_COPY}
@@ -66,9 +77,7 @@ export default function DashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="w-full">
-              <div
-                className="grid w-full grid-cols-[1fr_1fr_1fr_2fr] items-center gap-x-6 border-b border-border pb-2 text-[10px] uppercase tracking-wider text-muted-foreground"
-              >
+              <div className="grid w-full grid-cols-[1fr_1fr_1fr_2fr] items-center gap-x-6 border-b border-border pb-2 text-[10px] uppercase tracking-wider text-muted-foreground">
                 <span>Asset</span>
                 <span className="text-right">ORI</span>
                 <span className="text-right">24h</span>
@@ -115,7 +124,7 @@ export default function DashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {MOCK_ALERTS.slice(0, 4).map((a) => (
+              {market.alerts.map((a) => (
                 <AlertCard key={a.id} alert={a} />
               ))}
               <Link href="/alerts" className="text-xs text-muted-foreground hover:text-foreground">
@@ -127,13 +136,13 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <WalletActivityFeed wallets={MOCK_WALLETS.slice(0, 5)} />
+        <WalletActivityFeed wallets={wallets.wallets.slice(0, 5)} />
         <div>
           <h2 className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
             Protocol Health Rankings
           </h2>
           <div className="grid gap-3 sm:grid-cols-2">
-            {MOCK_PROTOCOLS.map((p) => (
+            {protocols.protocols.map((p) => (
               <ProtocolHealthCard key={p.id} protocol={p} />
             ))}
           </div>

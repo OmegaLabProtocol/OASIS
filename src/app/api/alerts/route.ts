@@ -1,6 +1,11 @@
-import { mockData } from "@/services/mockData";
+import { getLiveAlerts } from "@/services/dataService";
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  return NextResponse.json(mockData.getAlerts());
+  try {
+    return NextResponse.json(await getLiveAlerts());
+  } catch {
+    const { mockData } = await import("@/services/mockData");
+    return NextResponse.json(mockData.getAlerts());
+  }
 }

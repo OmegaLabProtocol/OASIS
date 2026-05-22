@@ -1,10 +1,14 @@
-import { mockData } from "@/services/mockData";
+import { getAllLiveTokenMetrics } from "@/services/dataService";
 import { NextResponse } from "next/server";
+
+export const revalidate = 300;
 
 export async function GET() {
   try {
-    return NextResponse.json(mockData.getTokens());
+    const tokens = await getAllLiveTokenMetrics();
+    return NextResponse.json({ tokens, source: "Public API" });
   } catch {
-    return NextResponse.json({ tokens: [], source: "Mock" }, { status: 500 });
+    const { mockData } = await import("@/services/mockData");
+    return NextResponse.json(mockData.getTokens());
   }
 }
