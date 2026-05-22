@@ -2,6 +2,12 @@ const COINGECKO_URL =
   process.env.NEXT_PUBLIC_COINGECKO_API_URL ||
   "https://api.coingecko.com/api/v3";
 
+const FETCH_TIMEOUT_MS = 10_000;
+
+async function fetchWithTimeout(url: string, init?: RequestInit) {
+  return fetch(url, { ...init, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+}
+
 const COIN_IDS: Record<string, string> = {
   ETH: "ethereum",
   SOL: "solana",
@@ -31,9 +37,8 @@ export async function fetchCoinPrices(
 
     if (!ids) return null;
 
-    const res = await fetch(
-      `${COINGECKO_URL}/simple/price?ids=${ids}&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true`,
-      { next: { revalidate: 300 } }
+    const res = await fetchWithTimeout(
+      `${COINGECKO_URL}/simple/price?ids=${ids}&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true`
     );
 
     if (!res.ok) return null;
@@ -64,9 +69,8 @@ export async function fetchCoinMarketChart(
   if (!id) return null;
 
   try {
-    const res = await fetch(
-      `${COINGECKO_URL}/coins/${id}/market_chart?vs_currency=usd&days=${days}`,
-      { next: { revalidate: 600 } }
+    const res = await fetchWithTimeout(
+      `${COINGECKO_URL}/coins/${id}/market_chart?vs_currency=usd&days=${days}`
     );
     if (!res.ok) return null;
     const data = await res.json();

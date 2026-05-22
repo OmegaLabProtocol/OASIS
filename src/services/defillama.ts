@@ -1,6 +1,12 @@
 const DEFILLAMA_URL =
   process.env.DEFILLAMA_API_URL || "https://api.llama.fi";
 
+const FETCH_TIMEOUT_MS = 10_000;
+
+async function fetchWithTimeout(url: string, init?: RequestInit) {
+  return fetch(url, { ...init, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+}
+
 export interface DefiLlamaProtocol {
   slug: string;
   name: string;
@@ -32,7 +38,7 @@ const TOKEN_CHAIN_MAP: Record<string, string> = {
 
 export async function fetchProtocolTvl(slug: string): Promise<number | null> {
   try {
-    const res = await fetch(`${DEFILLAMA_URL}/tvl/${slug}`, {
+    const res = await fetchWithTimeout(`${DEFILLAMA_URL}/tvl/${slug}`, {
       cache: "no-store",
     });
     if (!res.ok) return null;
@@ -62,8 +68,8 @@ export async function fetchProtocolTvls(): Promise<DefiLlamaProtocol[] | null> {
 
 export async function fetchChainTvls(): Promise<ChainTvl[] | null> {
   try {
-    const res = await fetch(`${DEFILLAMA_URL}/v2/chains`, {
-      next: { revalidate: 600 },
+    const res = await fetchWithTimeout(`${DEFILLAMA_URL}/v2/chains`, {
+      cache: "no-store",
     });
     if (!res.ok) return null;
     return (await res.json()) as ChainTvl[];
@@ -74,7 +80,7 @@ export async function fetchChainTvls(): Promise<ChainTvl[] | null> {
 
 export async function fetchProtocolFees30d(slug: string): Promise<number | null> {
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `${DEFILLAMA_URL}/summary/fees/${slug}?dataType=dailyRevenue`,
       { cache: "no-store" }
     );

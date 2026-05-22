@@ -1,7 +1,7 @@
 import { getLiveOriScore } from "@/services/dataService";
 import { NextResponse } from "next/server";
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
