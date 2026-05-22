@@ -17,7 +17,7 @@ import {
 } from "@/services/dataService";
 import Link from "next/link";
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const [market, protocols, wallets] = await Promise.all([

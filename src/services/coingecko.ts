@@ -43,10 +43,10 @@ export async function fetchCoinPrices(
     for (const [symbol, id] of Object.entries(COIN_IDS)) {
       if (data[id]) {
         result[symbol] = {
-          usd: data[id].usd,
-          usd_market_cap: data[id].usd_market_cap,
-          usd_24h_vol: data[id].usd_24h_vol,
-          usd_24h_change: data[id].usd_24h_change ?? 0,
+          usd: Number(data[id].usd) || 0,
+          usd_market_cap: Number(data[id].usd_market_cap) || 0,
+          usd_24h_vol: Number(data[id].usd_24h_vol) || 0,
+          usd_24h_change: Number(data[id].usd_24h_change) || 0,
         };
       }
     }

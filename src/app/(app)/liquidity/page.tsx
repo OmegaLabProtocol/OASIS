@@ -4,7 +4,7 @@ import { DataConfidenceBadge } from "@/components/DataConfidenceBadge";
 import { getLiveLiquidity } from "@/services/dataService";
 import Link from "next/link";
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 export default async function LiquidityPage() {
   const { assets, confidence } = await getLiveLiquidity();

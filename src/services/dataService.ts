@@ -55,14 +55,15 @@ function enrichRawMetrics(
   const enriched = { ...raw };
 
   if (price) {
-    enriched.priceUsd = price.usd;
-    enriched.marketCap = price.usd_market_cap;
-    enriched.volume24h = price.usd_24h_vol;
-    const changePct = Math.abs(price.usd_24h_change) / 100;
+    const change = Number(price.usd_24h_change) || 0;
+    enriched.priceUsd = Number(price.usd) || raw.priceUsd;
+    enriched.marketCap = Number(price.usd_market_cap) || raw.marketCap;
+    enriched.volume24h = Number(price.usd_24h_vol) || raw.volume24h;
+    const changePct = Math.abs(change) / 100;
     enriched.volatility30d = Math.min(1.5, Math.max(0.2, changePct * 4));
     enriched.movingAverageDeviation = Math.min(0.25, changePct * 0.6);
     enriched.maxDrawdown30d = Math.min(0.6, changePct * 2);
-    if (Math.abs(price.usd_24h_change) > 8) {
+    if (Math.abs(change) > 8) {
       enriched.abnormalVolumeFlag = true;
     }
   }
@@ -97,8 +98,8 @@ function buildTokenMetrics(
   const drivers = RISK_CHANGE_ATTRIBUTION[symbol] ?? ["Volatility spike"];
 
   const change24h =
-    price !== undefined && typeof price.usd_24h_change === "number"
-      ? Number(price.usd_24h_change.toFixed(1))
+    price !== undefined
+      ? Number((Number(price.usd_24h_change) || 0).toFixed(1))
       : Number((oriScore - prev).toFixed(1));
 
   return {
@@ -116,22 +117,33 @@ function buildTokenMetrics(
 }
 
 async function getLiveContext() {
-  const [prices, chains] = await Promise.all([
-    getCachedPrices(),
-    getCachedChains(),
-  ]);
-  return {
-    prices,
-    chains,
-    coingecko: !!prices,
-    defillama: !!chains,
-    source: resolveSource(!!prices, !!chains),
-    confidence: buildConfidence({
+  try {
+    const [prices, chains] = await Promise.all([
+      getCachedPrices(),
+      getCachedChains(),
+    ]);
+    return {
+      prices,
+      chains,
       coingecko: !!prices,
       defillama: !!chains,
-      mockFallback: !prices && !chains,
-    }),
-  };
+      source: resolveSource(!!prices, !!chains),
+      confidence: buildConfidence({
+        coingecko: !!prices,
+        defillama: !!chains,
+        mockFallback: !prices && !chains,
+      }),
+    };
+  } catch {
+    return {
+      prices: null,
+      chains: null,
+      coingecko: false,
+      defillama: false,
+      source: "Mock" as LiveDataSource,
+      confidence: buildConfidence({ mockFallback: true }),
+    };
+  }
 }
 
 export async function getAllLiveTokenMetrics(): Promise<OriMetrics[]> {
@@ -146,72 +158,93 @@ export async function getAllLiveTokenMetrics(): Promise<OriMetrics[]> {
 }
 
 export async function getLiveTokenDetail(symbol: string) {
-  const upper = symbol.toUpperCase();
-  const baseRaw = TOKEN_RAW_METRICS[upper];
-  if (!baseRaw) return null;
+  try {
+    const upper = symbol.toUpperCase();
+    const baseRaw = TOKEN_RAW_METRICS[upper];
+    if (!baseRaw) return null;
 
-  const ctx = await getLiveContext();
-  const price = ctx.prices?.[upper];
-  const chainTvl = getChainTvlForToken(upper, ctx.chains);
-  const raw = enrichRawMetrics(baseRaw, price, chainTvl);
-  const metrics = buildTokenMetrics(upper, raw, price);
+    const ctx = await getLiveContext();
+    const price = ctx.prices?.[upper];
+    const chainTvl = getChainTvlForToken(upper, ctx.chains);
+    const raw = enrichRawMetrics(baseRaw, price, chainTvl);
+    const metrics = buildTokenMetrics(upper, raw, price);
 
-  const liquidityStability = calculateLiquidityStability({
-    slippage1m: raw.slippage1m,
-    liquidityDepthUsd: raw.liquidityDepthUsd,
-    volumeLiquidityRatio: raw.volumeLiquidityRatio,
-    lpConcentration: raw.lpConcentration,
-  });
+    const liquidityStability = calculateLiquidityStability({
+      slippage1m: raw.slippage1m,
+      liquidityDepthUsd: raw.liquidityDepthUsd,
+      volumeLiquidityRatio: raw.volumeLiquidityRatio,
+      lpConcentration: raw.lpConcentration,
+    });
 
-  const priceHistory = await fetchCoinMarketChart(symbol, 30);
-  const mockHistory = getTokenHistory(symbol, metrics.oriScore);
-  const history = priceHistory
-    ? {
-        ori: pricesToHistory(priceHistory, metrics.oriScore),
-        liquidity: pricesToHistory(priceHistory, liquidityStability),
-        marketIntegrity: pricesToHistory(priceHistory, metrics.marketIntegrity),
-        smartMoney: mockHistory.smartMoney,
-      }
-    : mockHistory;
+    let priceHistory: [number, number][] | null = null;
+    try {
+      priceHistory = await fetchCoinMarketChart(symbol, 30);
+    } catch {
+      priceHistory = null;
+    }
 
-  return {
-    metrics: { ...metrics, liquidityStability },
-    raw,
-    history,
-    commentary: TOKEN_COMMENTARY[upper],
-    brief: RISK_BRIEF_DATA[upper],
-    confidence: ctx.confidence,
-    source: ctx.source,
-    livePrice: price
+    const mockHistory = getTokenHistory(symbol, metrics.oriScore);
+    const history = priceHistory
       ? {
-          usd: price.usd,
-          marketCap: price.usd_market_cap,
-          volume24h: price.usd_24h_vol,
-          change24h: price.usd_24h_change,
+          ori: pricesToHistory(priceHistory, metrics.oriScore),
+          liquidity: pricesToHistory(priceHistory, liquidityStability),
+          marketIntegrity: pricesToHistory(priceHistory, metrics.marketIntegrity),
+          smartMoney: mockHistory.smartMoney,
         }
-      : undefined,
-  };
+      : mockHistory;
+
+    return {
+      metrics: { ...metrics, liquidityStability },
+      raw,
+      history,
+      commentary: TOKEN_COMMENTARY[upper],
+      brief: RISK_BRIEF_DATA[upper],
+      confidence: ctx.confidence,
+      source: ctx.source,
+      livePrice: price
+        ? {
+            usd: price.usd,
+            marketCap: price.usd_market_cap,
+            volume24h: price.usd_24h_vol,
+            change24h: price.usd_24h_change,
+          }
+        : undefined,
+    };
+  } catch {
+    const { getTokenDetail } = await import("@/lib/tokenData");
+    return getTokenDetail(symbol);
+  }
 }
 
 export async function getLiveMarketOverview() {
-  const tokens = await getAllLiveTokenMetrics();
-  const avgOri = tokens.reduce((s, t) => s + t.oriScore, 0) / tokens.length;
-  const ctx = await getLiveContext();
+  try {
+    const tokens = await getAllLiveTokenMetrics();
+    const avgOri = tokens.reduce((s, t) => s + t.oriScore, 0) / tokens.length;
+    const ctx = await getLiveContext();
 
-  return {
-    marketRiskScore: Math.round(avgOri),
-    marketRiskLabel:
-      avgOri >= 80
-        ? "Low Systemic Risk"
-        : avgOri >= 60
-          ? "Moderate Systemic Risk"
-          : "Elevated Systemic Risk",
-    tokens,
-    timestamp: new Date().toISOString(),
-    source: ctx.source,
-    confidence: ctx.confidence,
-    alerts: MOCK_ALERTS.slice(0, 5),
-  };
+    return {
+      marketRiskScore: Math.round(avgOri),
+      marketRiskLabel:
+        avgOri >= 80
+          ? "Low Systemic Risk"
+          : avgOri >= 60
+            ? "Moderate Systemic Risk"
+            : "Elevated Systemic Risk",
+      tokens,
+      timestamp: new Date().toISOString(),
+      source: ctx.source,
+      confidence: ctx.confidence,
+      alerts: MOCK_ALERTS.slice(0, 5),
+    };
+  } catch {
+    const { getMarketOverview } = await import("@/lib/tokenData");
+    return {
+      ...getMarketOverview(),
+      source: "Mock" as LiveDataSource,
+      confidence: buildConfidence({ mockFallback: true }),
+      alerts: MOCK_ALERTS.slice(0, 5),
+    };
+  }
 }
 
 function estimateSlippage(base: number, ratio: number): number {

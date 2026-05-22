@@ -17,7 +17,7 @@ import { formatNumber } from "@/lib/utils";
 import { getLiveTokenDetail } from "@/services/dataService";
 import { ArrowLeft } from "lucide-react";
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 export function generateStaticParams() {
   return TOKEN_SYMBOLS.map((symbol) => ({ symbol }));

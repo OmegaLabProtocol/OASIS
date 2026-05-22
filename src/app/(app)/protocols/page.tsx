@@ -4,7 +4,7 @@ import { DataConfidenceBadge } from "@/components/DataConfidenceBadge";
 import { formatNumber } from "@/lib/utils";
 import { getLiveProtocols } from "@/services/dataService";
 
-export const revalidate = 600;
+export const dynamic = "force-dynamic";
 
 export default async function ProtocolsPage() {
   const { protocols, confidence } = await getLiveProtocols();
