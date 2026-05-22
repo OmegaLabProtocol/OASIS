@@ -353,7 +353,9 @@ export async function getLiveAlerts() {
 export async function getLiveOriScore(symbol: string) {
   const detail = await getLiveTokenDetail(symbol);
   if (!detail) return null;
-  const { metrics, source, confidence } = detail;
+  const { metrics, confidence } = detail;
+  const source =
+    "source" in detail ? detail.source : ("Mock" as LiveDataSource);
   return {
     asset: metrics.symbol,
     oriScore: metrics.oriScore,
