@@ -1,8 +1,11 @@
 export type RiskLabel =
   | "Institutional Grade"
-  | "Moderate Risk"
-  | "Elevated Risk"
-  | "High Risk";
+  | "Strategic Grade"
+  | "Established"
+  | "Developing"
+  | "Speculative"
+  | "High Risk"
+  | "Distressed";
 
 export type DataSourceType = "Mock" | "Public API" | "Estimated";
 export type ConfidenceLevel = "High" | "Medium" | "Low";
@@ -110,3 +113,31 @@ export interface RiskBrief {
   protocolSummary: string;
   commentary: string;
 }
+
+export interface IntelligenceReportBrief {
+  strengths: string[];
+  risks: string[];
+  liquidity: string;
+  wallet: string;
+  protocol: string;
+}
+
+export interface GenerateReportPayload {
+  metrics: OriMetrics;
+  components: OriComponentScores;
+  raw: TokenRawMetrics;
+  confidence: DataConfidence;
+  brief?: IntelligenceReportBrief;
+  commentary?: string;
+  dataSource?: string;
+  mockDataUsed?: boolean;
+  mockCategories?: string[];
+  mockDataDisclaimer?: string;
+}
+
+export interface GenerateReportResponse {
+  report: string;
+  source: "openai" | "demo";
+}
+
+export type { OriLookupResult, OriCategoryScores, OriCategoryMetadata, OriCategoryMeta } from "@/lib/data/types";

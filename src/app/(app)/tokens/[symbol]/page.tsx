@@ -8,8 +8,15 @@ import { DataConfidenceBadge } from "@/components/DataConfidenceBadge";
 import { ScoreBreakdownChart } from "@/components/ScoreBreakdownChart";
 import { HistoricalChart } from "@/components/HistoricalChart";
 import { AIInsightCard } from "@/components/AIInsightCard";
+import {
+  ORIIntelligenceReport,
+  ORIIntelligenceReportButton,
+  ORIIntelligenceReportPanel,
+} from "@/components/ORIIntelligenceReport";
 import { RiskBriefGenerator } from "@/components/RiskBriefGenerator";
 import { AddToWatchlistButton } from "@/components/AddToWatchlistButton";
+import { DataSourcesTrustPanel } from "@/components/DataSourcesTrustPanel";
+import { OriCategoryBreakdown } from "@/components/OriCategoryBreakdown";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { COMPONENT_LABELS } from "@/lib/scoring";
 import type { OriComponentScores } from "@/lib/types";
@@ -34,6 +41,8 @@ export default async function TokenPage({
   if (!detail) notFound();
 
   const { metrics, raw, history, commentary, brief, confidence } = detail;
+  const dataSource = "source" in detail ? detail.source : undefined;
+  const oriResult = "oriResult" in detail ? detail.oriResult : null;
   const components: OriComponentScores = {
     liquidityStability: metrics.liquidityStability,
     marketIntegrity: metrics.marketIntegrity,
@@ -69,14 +78,29 @@ export default async function TokenPage({
 
       <DataConfidenceBadge confidence={confidence} />
 
+      <ORIIntelligenceReport
+        metrics={metrics}
+        components={components}
+        raw={raw}
+        confidence={confidence}
+        brief={brief}
+        commentary={commentary.commentary}
+        dataSource={dataSource}
+        oriResult={oriResult}
+      >
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-1">
-          <CardContent className="flex flex-col items-center pt-6">
+          <CardContent className="flex flex-col items-center pt-6 pb-6">
             <ScoreGauge score={metrics.oriScore} size="lg" />
-            <RiskBadge label={metrics.riskLabel} className="mt-4" />
+            <RiskBadge
+              label={metrics.riskLabel}
+              score={metrics.oriScore}
+              className="mt-4 w-full max-w-[220px]"
+            />
             <p className="mt-2 text-xs text-muted-foreground text-center">
               Omega Risk Index — proprietary institutional benchmark
             </p>
+            <ORIIntelligenceReportButton />
           </CardContent>
         </Card>
 
@@ -100,6 +124,19 @@ export default async function TokenPage({
           reasons={metrics.riskChangeReasons}
         />
       )}
+
+      <ORIIntelligenceReportPanel />
+      </ORIIntelligenceReport>
+
+      {oriResult && (
+        <OriCategoryBreakdown
+          categoryScores={oriResult.categoryScores}
+          categoryMetadata={oriResult.categoryMetadata}
+          confidenceScore={oriResult.confidenceScore}
+        />
+      )}
+
+      <DataSourcesTrustPanel oriResult={oriResult ?? null} />
 
       <AIInsightCard summary={commentary.summary} />
 

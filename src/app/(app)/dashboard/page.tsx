@@ -9,7 +9,7 @@ import { DataConfidenceBadge } from "@/components/DataConfidenceBadge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ORI_BENCHMARK_COPY } from "@/lib/constants";
-import { cn, formatPercent } from "@/lib/utils";
+import { OriChange24h } from "@/components/OriChange24h";
 import {
   getLiveMarketOverview,
   getLiveProtocols,
@@ -94,14 +94,11 @@ export default async function DashboardPage() {
                     <span className="font-mono text-right tabular-nums">
                       {t.oriScore}
                     </span>
-                    <span
-                      className={cn(
-                        "font-mono text-right tabular-nums text-xs",
-                        t.change24h >= 0 ? "text-success" : "text-destructive"
-                      )}
-                    >
-                      {formatPercent(t.change24h)}
-                    </span>
+                    <OriChange24h
+                      change={t.change24h}
+                      className="text-right"
+                      decimals={1}
+                    />
                     <Badge
                       variant="outline"
                       className="w-full min-w-0 justify-center truncate text-[9px]"

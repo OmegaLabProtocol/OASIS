@@ -1,5 +1,6 @@
 "use client";
 
+import { getOriTier } from "@/lib/oriColors";
 import { cn } from "@/lib/utils";
 
 interface ScoreGaugeProps {
@@ -15,15 +16,7 @@ export function ScoreGauge({ score, size = "md", label = "ORI" }: ScoreGaugeProp
   const radius = (dim - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / 100) * circumference;
-
-  const color =
-    score >= 80
-      ? "stroke-success"
-      : score >= 60
-        ? "stroke-foreground/60"
-        : score >= 40
-          ? "stroke-warning"
-          : "stroke-destructive";
+  const tier = getOriTier(score);
 
   return (
     <div className="relative inline-flex flex-col items-center">
@@ -46,7 +39,8 @@ export function ScoreGauge({ score, size = "md", label = "ORI" }: ScoreGaugeProp
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
-          className={cn("transition-all duration-700", color)}
+          stroke={tier.color}
+          className="transition-all duration-700"
         />
       </svg>
       <div

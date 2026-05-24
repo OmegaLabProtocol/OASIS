@@ -11,7 +11,13 @@ import {
   RISK_BRIEF_DATA,
   getTokenHistory,
 } from "@/data/tokens";
-import { buildConfidence } from "@/lib/dataConfidence";
+import { buildConfidence, buildConfidenceFromOri } from "@/lib/dataConfidence";
+import { computeOriForSymbol } from "@/lib/data/oriAggregator";
+import {
+  mapCategoryScoresToLegacyComponents,
+  mapOriScoreToRiskLabel,
+} from "@/lib/scoring/ori";
+import type { OriLookupResult } from "@/lib/data/types";
 import {
   computeOriFromRaw,
   calculateLiquidityStability,
@@ -80,6 +86,90 @@ function enrichRawMetrics(
   return enriched;
 }
 
+function enrichRawFromOri(raw: TokenRawMetrics, ori: OriLookupResult): TokenRawMetrics {
+  const enriched = { ...raw };
+  const { market, holders, protocol } = ori;
+
+  if (market?.price != null) enriched.priceUsd = market.price;
+  if (market?.marketCap != null) enriched.marketCap = market.marketCap;
+  if (market?.volume24h != null) enriched.volume24h = market.volume24h;
+
+  if (market?.priceChange24h != null) {
+    const changePct = Math.abs(market.priceChange24h) / 100;
+    enriched.volatility30d = Math.min(1.5, Math.max(0.2, changePct * 4));
+    enriched.movingAverageDeviation = Math.min(0.25, changePct * 0.6);
+    enriched.maxDrawdown30d = Math.min(0.6, changePct * 2);
+    if (Math.abs(market.priceChange24h) > 8) enriched.abnormalVolumeFlag = true;
+  }
+
+  if (holders?.top10HolderPercent != null) {
+    enriched.top10HolderPercent = holders.top10HolderPercent / 100;
+  }
+  if (holders?.top50HolderPercent != null) {
+    enriched.top50HolderPercent = holders.top50HolderPercent / 100;
+  }
+  if (holders?.top25HolderPercent != null) {
+    enriched.top50HolderPercent = Math.max(
+      enriched.top50HolderPercent,
+      holders.top25HolderPercent / 100
+    );
+  }
+
+  if (protocol?.tvl != null && protocol.tvl > 0) {
+    enriched.liquidityDepthUsd = protocol.tvl * 0.06;
+  }
+
+  if (enriched.volume24h && enriched.liquidityDepthUsd > 0) {
+    enriched.volumeLiquidityRatio = enriched.volume24h / enriched.liquidityDepthUsd;
+  }
+
+  if (market?.circulatingSupply != null && market.totalSupply != null && market.totalSupply > 0) {
+    const dilution = 1 - market.circulatingSupply / market.totalSupply;
+    enriched.stablecoinDependency = Math.min(1, Math.max(0, dilution));
+  }
+
+  return enriched;
+}
+
+function buildTokenMetricsFromOri(
+  symbol: string,
+  raw: TokenRawMetrics,
+  ori: OriLookupResult,
+  price?: CoinGeckoPrice
+): OriMetrics {
+  const legacyComponents = mapCategoryScoresToLegacyComponents(ori.categoryScores);
+  const prev = PREVIOUS_ORI_SCORES[symbol] ?? ori.oriScore;
+  const change7dMap: Record<string, number> = {
+    ETH: -2.1,
+    SOL: 1.4,
+    ARB: -0.8,
+    UNI: -1.2,
+    AAVE: 0.6,
+    OP: -3.5,
+  };
+  const drivers = RISK_CHANGE_ATTRIBUTION[symbol] ?? ["Volatility spike"];
+
+  const change24h =
+    price !== undefined
+      ? Number((Number(price.usd_24h_change) || 0).toFixed(1))
+      : ori.market?.priceChange24h != null
+        ? Number(ori.market.priceChange24h.toFixed(1))
+        : Number((ori.oriScore - prev).toFixed(1));
+
+  return {
+    symbol: raw.symbol,
+    name: raw.name,
+    oriScore: ori.oriScore,
+    riskLabel: mapOriScoreToRiskLabel(ori.oriScore),
+    change24h,
+    change7d: change7dMap[symbol] ?? change24h,
+    topRiskDriver: drivers[0],
+    previousOriScore: prev,
+    riskChangeReasons: drivers,
+    ...legacyComponents,
+  };
+}
+
 function buildTokenMetrics(
   symbol: string,
   raw: TokenRawMetrics,
@@ -116,6 +206,14 @@ function buildTokenMetrics(
   };
 }
 
+async function getOriResult(symbol: string): Promise<OriLookupResult | null> {
+  try {
+    return await computeOriForSymbol(symbol);
+  } catch {
+    return null;
+  }
+}
+
 async function getLiveContext() {
   try {
     const [prices, chains] = await Promise.all([
@@ -148,13 +246,22 @@ async function getLiveContext() {
 
 export async function getAllLiveTokenMetrics(): Promise<OriMetrics[]> {
   const ctx = await getLiveContext();
-  return COINGECKO_SYMBOLS.map((symbol) => {
-    const baseRaw = TOKEN_RAW_METRICS[symbol];
-    const price = ctx.prices?.[symbol];
-    const chainTvl = getChainTvlForToken(symbol, ctx.chains);
-    const raw = enrichRawMetrics(baseRaw, price, chainTvl);
-    return buildTokenMetrics(symbol, raw, price);
-  });
+  const results = await Promise.all(
+    COINGECKO_SYMBOLS.map(async (symbol) => {
+      const baseRaw = TOKEN_RAW_METRICS[symbol];
+      const price = ctx.prices?.[symbol];
+      const oriResult = await getOriResult(symbol);
+
+      let raw = enrichRawMetrics(baseRaw, price, getChainTvlForToken(symbol, ctx.chains));
+      if (oriResult && oriResult.dataMode !== "mock") {
+        raw = enrichRawFromOri(raw, oriResult);
+        return buildTokenMetricsFromOri(symbol, raw, oriResult, price);
+      }
+
+      return buildTokenMetrics(symbol, raw, price);
+    })
+  );
+  return results;
 }
 
 export async function getLiveTokenDetail(symbol: string) {
@@ -166,8 +273,36 @@ export async function getLiveTokenDetail(symbol: string) {
     const ctx = await getLiveContext();
     const price = ctx.prices?.[upper];
     const chainTvl = getChainTvlForToken(upper, ctx.chains);
-    const raw = enrichRawMetrics(baseRaw, price, chainTvl);
-    const metrics = buildTokenMetrics(upper, raw, price);
+    const oriResult = await getOriResult(upper);
+
+    let raw = enrichRawMetrics(baseRaw, price, chainTvl);
+    let metrics: OriMetrics;
+    let confidence = ctx.confidence;
+    let source = ctx.source;
+
+    if (oriResult && oriResult.dataMode !== "mock") {
+      raw = enrichRawFromOri(raw, oriResult);
+      metrics = buildTokenMetricsFromOri(upper, raw, oriResult, price);
+      confidence = buildConfidenceFromOri(oriResult, {
+        coingecko: ctx.coingecko,
+        defillama: ctx.defillama,
+      });
+      source =
+        oriResult.dataMode === "live"
+          ? "Public API"
+          : oriResult.dataMode === "partial"
+            ? "Estimated"
+            : "Mock";
+    } else {
+      metrics = buildTokenMetrics(upper, raw, price);
+      if (oriResult) {
+        confidence = buildConfidenceFromOri(oriResult, {
+          coingecko: ctx.coingecko,
+          defillama: ctx.defillama,
+          mockFallback: true,
+        });
+      }
+    }
 
     const liquidityStability = calculateLiquidityStability({
       slippage1m: raw.slippage1m,
@@ -199,8 +334,9 @@ export async function getLiveTokenDetail(symbol: string) {
       history,
       commentary: TOKEN_COMMENTARY[upper],
       brief: RISK_BRIEF_DATA[upper],
-      confidence: ctx.confidence,
-      source: ctx.source,
+      confidence,
+      source,
+      oriResult,
       livePrice: price
         ? {
             usd: price.usd,
@@ -208,7 +344,14 @@ export async function getLiveTokenDetail(symbol: string) {
             volume24h: price.usd_24h_vol,
             change24h: price.usd_24h_change,
           }
-        : undefined,
+        : oriResult?.market?.price != null
+          ? {
+              usd: oriResult.market.price,
+              marketCap: oriResult.market.marketCap ?? 0,
+              volume24h: oriResult.market.volume24h ?? 0,
+              change24h: oriResult.market.priceChange24h ?? 0,
+            }
+          : undefined,
     };
   } catch {
     const { getTokenDetail } = await import("@/lib/tokenData");

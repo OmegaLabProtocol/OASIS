@@ -1,4 +1,5 @@
 import type { OriComponentScores, RiskLabel, TokenRawMetrics } from "./types";
+import { classifyOriRiskLabel } from "./oriColors";
 
 export function clampScore(score: number): number {
   return Math.max(0, Math.min(100, Math.round(score)));
@@ -141,10 +142,7 @@ export function calculateOriScore(components: OriComponentScores): number {
 }
 
 export function classifyOriRisk(score: number): RiskLabel {
-  if (score >= 80) return "Institutional Grade";
-  if (score >= 60) return "Moderate Risk";
-  if (score >= 40) return "Elevated Risk";
-  return "High Risk";
+  return classifyOriRiskLabel(score);
 }
 
 export function computeOriFromRaw(metrics: TokenRawMetrics): {

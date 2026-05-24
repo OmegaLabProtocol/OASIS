@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { OriChange24h } from "@/components/OriChange24h";
 import { RiskBadge } from "@/components/RiskBadge";
 import { ScoreGauge } from "@/components/ScoreGauge";
 import type { OriMetrics } from "@/lib/types";
-import { formatPercent } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
 
 export function OriScoreCard({ token }: { token: OriMetrics }) {
@@ -22,16 +22,13 @@ export function OriScoreCard({ token }: { token: OriMetrics }) {
             <div className="shrink-0">
               <ScoreGauge score={token.oriScore} size="sm" />
             </div>
-            <div className="flex min-w-0 flex-1 flex-col items-stretch gap-1.5">
-              <RiskBadge
-                label={token.riskLabel}
-                className="h-auto w-full max-w-full justify-center whitespace-normal px-2 py-1 text-center text-[10px] normal-case leading-snug tracking-normal"
+            <div className="flex min-w-0 flex-1 flex-col items-stretch gap-1">
+              <RiskBadge label={token.riskLabel} score={token.oriScore} />
+              <OriChange24h
+                change={token.change24h}
+                className="text-right"
+                decimals={1}
               />
-              <p
-                className={`text-right text-xs font-mono tabular-nums ${token.change24h >= 0 ? "text-success" : "text-destructive"}`}
-              >
-                24h {formatPercent(token.change24h, 1)}
-              </p>
             </div>
           </div>
           <p className="line-clamp-2 min-w-0 text-[10px] leading-snug text-muted-foreground">

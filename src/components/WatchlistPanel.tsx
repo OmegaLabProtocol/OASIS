@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { OriChange24h } from "@/components/OriChange24h";
 import { RiskBadge } from "@/components/RiskBadge";
 import { useWatchlist } from "@/components/providers/watchlist-provider";
 import type { OriMetrics } from "@/lib/types";
@@ -52,12 +53,14 @@ export function WatchlistPanel() {
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-medium w-10">{symbol}</span>
                     <span className="font-mono text-sm">{token.oriScore}</span>
-                    <RiskBadge label={token.riskLabel} />
+                    <RiskBadge
+                      label={token.riskLabel}
+                      score={token.oriScore}
+                      className="w-fit shrink-0"
+                    />
                   </div>
                   <div className="mt-1 flex gap-3 text-[10px] text-muted-foreground">
-                    <span className={token.change24h >= 0 ? "text-success" : "text-destructive"}>
-                      24h {formatPercent(token.change24h)}
-                    </span>
+                    <OriChange24h change={token.change24h} decimals={1} />
                     <span>7d {formatPercent(token.change7d)}</span>
                     <span className="truncate max-w-[120px]">{token.topRiskDriver}</span>
                   </div>
