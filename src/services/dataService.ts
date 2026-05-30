@@ -9,25 +9,54 @@ import {
   RISK_CHANGE_ATTRIBUTION,
   TOKEN_COMMENTARY,
   RISK_BRIEF_DATA,
-  getTokenHistory,
+  get7dChange,
 } from "@/data/tokens";
 import { buildConfidence, buildConfidenceFromOri } from "@/lib/dataConfidence";
-import { computeOriForSymbol } from "@/lib/data/oriAggregator";
 import {
-  mapCategoryScoresToLegacyComponents,
-  mapOriScoreToRiskLabel,
-} from "@/lib/scoring/ori";
-import type { OriLookupResult } from "@/lib/data/types";
+  computeOriForSymbol,
+  computeOriForDynamicEntry,
+} from "@/lib/data/oriAggregator";
+import {
+  buildDynamicRegistryEntry,
+  getRegistryBySymbol,
+} from "@/lib/data/tokenRegistry";
+import { mapCategoryScoresToLegacyComponents } from "@/lib/scoring/ori";
+import type { OriLookupResult, TokenRegistryEntry } from "@/lib/data/types";
+import { fetchCoinProfile } from "@/lib/search/providers/coingecko";
+import { oriLog } from "@/services/ori/cache";
+import type { TokenIdentity } from "@/lib/ori/types";
 import {
   computeOriFromRaw,
   calculateLiquidityStability,
 } from "@/lib/scoring";
-import type { DataSourceType, OriMetrics, TokenRawMetrics } from "@/lib/types";
+import { deriveORIResult } from "@/lib/ori/service";
+import { buildFallbackResult } from "@/lib/ori/fallback";
+import { resolveToken } from "@/lib/ori/tokenMap";
+import {
+  historyToPoints,
+  buildSeries,
+  buildHistory,
+  previousScoreFromHistory,
+} from "@/lib/ori/history";
+import {
+  getColor,
+  getGrade,
+  getORIChange,
+  getORINote,
+  getRiskTier,
+  roundScore,
+} from "@/lib/ori/grade";
+import type { ORIResult } from "@/lib/ori/types";
+import type {
+  DataSourceType,
+  OriComponentScores,
+  OriMetrics,
+  RiskLabel,
+  TokenRawMetrics,
+} from "@/lib/types";
 import {
   COINGECKO_SYMBOLS,
   fetchCoinPrices,
-  fetchCoinMarketChart,
-  pricesToHistory,
   type CoinGeckoPrice,
 } from "./coingecko";
 import {
@@ -131,78 +160,76 @@ function enrichRawFromOri(raw: TokenRawMetrics, ori: OriLookupResult): TokenRawM
   return enriched;
 }
 
-function buildTokenMetricsFromOri(
-  symbol: string,
+/**
+ * Build the legacy OriMetrics view object from the canonical ORIResult.
+ * The headline score, grade, percent change, and previous score ALWAYS come
+ * from the ORIResult — the 7-component breakdown is supplementary display only.
+ */
+function metricsFromResult(
+  result: ORIResult,
   raw: TokenRawMetrics,
-  ori: OriLookupResult,
-  price?: CoinGeckoPrice
+  components: OriComponentScores
 ): OriMetrics {
-  const legacyComponents = mapCategoryScoresToLegacyComponents(ori.categoryScores);
-  const prev = PREVIOUS_ORI_SCORES[symbol] ?? ori.oriScore;
-  const change7dMap: Record<string, number> = {
-    ETH: -2.1,
-    SOL: 1.4,
-    ARB: -0.8,
-    UNI: -1.2,
-    AAVE: 0.6,
-    OP: -3.5,
-  };
-  const drivers = RISK_CHANGE_ATTRIBUTION[symbol] ?? ["Volatility spike"];
-
-  const change24h =
-    price !== undefined
-      ? Number((Number(price.usd_24h_change) || 0).toFixed(1))
-      : ori.market?.priceChange24h != null
-        ? Number(ori.market.priceChange24h.toFixed(1))
-        : Number((ori.oriScore - prev).toFixed(1));
-
+  const drivers = RISK_CHANGE_ATTRIBUTION[result.symbol] ?? ["Volatility spike"];
   return {
     symbol: raw.symbol,
     name: raw.name,
-    oriScore: ori.oriScore,
-    riskLabel: mapOriScoreToRiskLabel(ori.oriScore),
-    change24h,
-    change7d: change7dMap[symbol] ?? change24h,
+    oriScore: result.currentScore,
+    riskLabel: result.grade as RiskLabel,
+    change24h: result.percentChange ?? 0,
+    change7d: get7dChange(result.symbol),
     topRiskDriver: drivers[0],
-    previousOriScore: prev,
+    previousOriScore: result.previousScore ?? result.currentScore,
     riskChangeReasons: drivers,
-    ...legacyComponents,
+    ...components,
   };
 }
 
-function buildTokenMetrics(
+/** Resolve the canonical ORIResult + supplementary component breakdown. */
+function resolveResultAndComponents(
   symbol: string,
   raw: TokenRawMetrics,
-  price?: CoinGeckoPrice
-): OriMetrics {
-  const { components, oriScore, riskLabel } = computeOriFromRaw(raw);
-  const prev = PREVIOUS_ORI_SCORES[symbol] ?? oriScore;
-  const change7dMap: Record<string, number> = {
-    ETH: -2.1,
-    SOL: 1.4,
-    ARB: -0.8,
-    UNI: -1.2,
-    AAVE: 0.6,
-    OP: -3.5,
-  };
-  const drivers = RISK_CHANGE_ATTRIBUTION[symbol] ?? ["Volatility spike"];
-
-  const change24h =
-    price !== undefined
-      ? Number((Number(price.usd_24h_change) || 0).toFixed(1))
-      : Number((oriScore - prev).toFixed(1));
-
+  ori: OriLookupResult | null
+): { result: ORIResult; components: OriComponentScores } {
+  const identity = resolveToken(symbol);
+  if (ori && identity) {
+    return {
+      result: deriveORIResult(identity, ori),
+      components: mapCategoryScoresToLegacyComponents(ori.categoryScores),
+    };
+  }
+  const fallback = buildFallbackResult(symbol);
   return {
+    result: fallback ?? deriveFromRaw(symbol, raw),
+    components: computeOriFromRaw(raw).components,
+  };
+}
+
+/** Last-resort ORIResult when a token isn't in the registry (kept deterministic). */
+function deriveFromRaw(symbol: string, raw: TokenRawMetrics): ORIResult {
+  const { oriScore } = computeOriFromRaw(raw);
+  const current = roundScore(oriScore);
+  const baselineAnchor = PREVIOUS_ORI_SCORES[symbol] ?? current;
+  const history = buildHistory(symbol, current, baselineAnchor);
+  const previous = previousScoreFromHistory(history);
+  const { absoluteChange, percentChange } = getORIChange(current, previous);
+  const grade = getGrade(current);
+  return {
+    tokenId: symbol.toUpperCase(),
     symbol: raw.symbol,
     name: raw.name,
-    oriScore,
-    riskLabel,
-    change24h,
-    change7d: change7dMap[symbol] ?? change24h,
-    topRiskDriver: drivers[0],
-    previousOriScore: prev,
-    riskChangeReasons: drivers,
-    ...components,
+    currentScore: current,
+    previousScore: previous,
+    absoluteChange,
+    percentChange,
+    grade,
+    riskTier: getRiskTier(current),
+    note: getORINote(current, percentChange, grade),
+    color: getColor(current),
+    history,
+    lastUpdated: new Date().toISOString(),
+    dataSource: "fallback",
+    refreshStatus: "stale",
   };
 }
 
@@ -253,22 +280,280 @@ export async function getAllLiveTokenMetrics(): Promise<OriMetrics[]> {
       const oriResult = await getOriResult(symbol);
 
       let raw = enrichRawMetrics(baseRaw, price, getChainTvlForToken(symbol, ctx.chains));
-      if (oriResult && oriResult.dataMode !== "mock") {
+      if (oriResult) {
         raw = enrichRawFromOri(raw, oriResult);
-        return buildTokenMetricsFromOri(symbol, raw, oriResult, price);
       }
 
-      return buildTokenMetrics(symbol, raw, price);
+      const { result, components } = resolveResultAndComponents(symbol, raw, oriResult);
+      return metricsFromResult(result, raw, components);
     })
   );
   return results;
+}
+
+/** Neutral baseline raw metrics for a dynamic token (overlaid with live data). */
+function dynamicBaseRaw(symbol: string, name: string): TokenRawMetrics {
+  return {
+    symbol,
+    name,
+    slippage1m: 1.5,
+    liquidityDepthUsd: 5_000_000,
+    volumeLiquidityRatio: 0.3,
+    lpConcentration: 0.5,
+    abnormalVolumeFlag: false,
+    washTradingRisk: 0.4,
+    priceManipulationRisk: 0.4,
+    exchangeConcentration: 0.5,
+    smartMoneyNetFlow30d: 0,
+    topWalletAccumulation: 0,
+    vcWalletSellingPressure: 0.4,
+    exchangeNetFlow: 0,
+    volatility30d: 0.6,
+    maxDrawdown30d: 0.35,
+    movingAverageDeviation: 0.1,
+    top10HolderPercent: 0.5,
+    top50HolderPercent: 0.7,
+    insiderWalletPercent: 0.15,
+    socialVolumeSpike: 0.3,
+    sentimentScore: 0.5,
+    priceSentimentDivergence: 0.3,
+    botActivityRisk: 0.4,
+    bridgeExposure: 0.3,
+    stablecoinDependency: 0.2,
+    smartContractRisk: 0.4,
+    chainDependency: 0.5,
+    governanceAttackRisk: 0.3,
+  };
+}
+
+const DYNAMIC_DISCOVERY_NOTE =
+  "This asset was analyzed using dynamic token discovery. Some provider mappings may be unavailable, which can reduce report confidence.";
+
+function buildSyntheticCommentary(
+  name: string,
+  result: ORIResult,
+  mockCategories: string[],
+  isDynamic: boolean
+): { summary: string; commentary: string } {
+  const mockNote =
+    mockCategories.length > 0
+      ? ` Estimated/MVP fallback data was applied for: ${mockCategories.join(", ")}.`
+      : "";
+  if (isDynamic) {
+    return {
+      summary: `${name} carries an ORI of ${result.currentScore} (${result.grade}). ${DYNAMIC_DISCOVERY_NOTE}`,
+      commentary: `${name} was resolved via dynamic token discovery rather than the curated registry, so coverage is driven primarily by live CoinGecko market data with estimated values elsewhere.${mockNote} Treat this analysis as directional until full provider mappings are curated for this asset.`,
+    };
+  }
+  return {
+    summary: `${name} carries an ORI of ${result.currentScore} (${result.grade}), resolved through curated registry provider mappings.`,
+    commentary: `${name} is a curated registry asset; its ORI is computed from mapped providers (CoinGecko, DeFiLlama, explorer, governance, and developer activity where available).${mockNote}`,
+  };
+}
+
+function buildSyntheticBrief(
+  name: string,
+  isDynamic: boolean
+): {
+  strengths: string[];
+  risks: string[];
+  liquidity: string;
+  wallet: string;
+  protocol: string;
+} {
+  return {
+    strengths: [
+      "Live market data resolved from CoinGecko",
+      isDynamic
+        ? "Flows through the same ORI scoring engine as curated assets"
+        : "Curated provider mappings used for enrichment",
+    ],
+    risks: [
+      isDynamic
+        ? "Limited curated provider coverage (dynamic discovery)"
+        : "Some categories may still rely on estimated data",
+      "Estimated/MVP fallback data may apply to uncovered categories",
+    ],
+    liquidity: `Liquidity depth for ${name} is estimated unless a curated depth provider is mapped.`,
+    wallet: "Holder concentration is estimated unless a supported on-chain explorer mapping is available.",
+    protocol: "Protocol exposure uses DeFiLlama only on an exact protocol match; otherwise estimated.",
+  };
+}
+
+/**
+ * Render a token through the EXISTING token detail data contract from an
+ * already-computed lookup. Shared by dynamic (CoinGecko) and curated-but-not-
+ * statically-authored registry tokens. Reuses the same scoring engine, history,
+ * and confidence framework as fully tracked tokens — only commentary/brief and
+ * the raw baseline are synthesized (and disclosed).
+ */
+function assembleSyntheticDetail(args: {
+  symbol: string;
+  name: string;
+  chain?: string;
+  coingeckoId: string;
+  oriResult: OriLookupResult | null;
+  registryStatus: "curated" | "dynamic";
+}) {
+  const { symbol, name, chain, coingeckoId, oriResult, registryStatus } = args;
+  const isDynamic = registryStatus === "dynamic";
+
+  const identity: TokenIdentity = { tokenId: coingeckoId, symbol, name, chain };
+
+  let raw = dynamicBaseRaw(symbol, name);
+  let components: OriComponentScores;
+  let result: ORIResult;
+  let confidence = buildConfidence({ mockFallback: true });
+  let source: LiveDataSource = "Mock";
+
+  if (oriResult) {
+    raw = enrichRawFromOri(raw, oriResult);
+    components = mapCategoryScoresToLegacyComponents(oriResult.categoryScores);
+    result = deriveORIResult(identity, oriResult);
+    confidence = buildConfidenceFromOri(oriResult, {
+      coingecko: oriResult.market?.price != null,
+      defillama: oriResult.protocol?.tvl != null,
+      mockFallback: oriResult.dataMode === "mock",
+    });
+    source =
+      oriResult.dataMode === "live"
+        ? "Public API"
+        : oriResult.dataMode === "partial"
+          ? "Estimated"
+          : "Mock";
+  } else {
+    components = computeOriFromRaw(raw).components;
+    result = deriveFromRaw(symbol, raw);
+  }
+
+  const metrics = metricsFromResult(result, raw, components);
+
+  const liquidityStability = calculateLiquidityStability({
+    slippage1m: raw.slippage1m,
+    liquidityDepthUsd: raw.liquidityDepthUsd,
+    volumeLiquidityRatio: raw.volumeLiquidityRatio,
+    lpConcentration: raw.lpConcentration,
+  });
+
+  const history = {
+    ori: historyToPoints(result.history),
+    liquidity: historyToPoints(buildSeries(symbol, liquidityStability)),
+    marketIntegrity: historyToPoints(buildSeries(symbol, metrics.marketIntegrity)),
+    smartMoney: historyToPoints(buildSeries(symbol, metrics.smartMoneyPositioning)),
+  };
+
+  const commentary = buildSyntheticCommentary(
+    name,
+    result,
+    oriResult?.mockCategories ?? [],
+    isDynamic
+  );
+  const brief = buildSyntheticBrief(name, isDynamic);
+
+  oriLog("token:load", {
+    coingeckoId,
+    symbol,
+    registryStatus,
+    chain: chain ?? "unknown",
+    providersSuccessful: oriResult
+      ? {
+          coingecko: oriResult.market?.price != null,
+          defillama: oriResult.protocol?.tvl != null,
+          explorer: oriResult.holders?.holderCount != null,
+        }
+      : "none",
+    mockCategories: oriResult?.mockCategories ?? [],
+    oriGenerated: result.currentScore,
+    historyStatus: "initialized-from-snapshot",
+  });
+
+  return {
+    metrics: { ...metrics, liquidityStability },
+    raw,
+    history,
+    commentary,
+    brief,
+    confidence,
+    source,
+    oriResult,
+    oriResultNormalized: result,
+    livePrice:
+      oriResult?.market?.price != null
+        ? {
+            usd: oriResult.market.price,
+            marketCap: oriResult.market.marketCap ?? 0,
+            volume24h: oriResult.market.volume24h ?? 0,
+            change24h: oriResult.market.priceChange24h ?? 0,
+          }
+        : undefined,
+  };
+}
+
+/** Curated registry token that lacks hand-authored static detail data. */
+async function getCuratedRegistryDetail(entry: TokenRegistryEntry) {
+  const oriResult = await getOriResult(entry.symbol);
+  return assembleSyntheticDetail({
+    symbol: entry.symbol,
+    name: entry.name,
+    chain: entry.chain,
+    coingeckoId: entry.coingeckoId,
+    oriResult,
+    registryStatus: "curated",
+  });
+}
+
+/**
+ * Resolve a dynamic (non-registry) token by CoinGecko id through the SAME
+ * enrichment + scoring pipeline as curated tokens. Provider mappings are never
+ * guessed (see buildDynamicRegistryEntry).
+ */
+async function getDynamicTokenDetail(coingeckoId: string) {
+  const profile = await fetchCoinProfile(coingeckoId);
+  if (!profile) {
+    oriLog("token:load", { coingeckoId, status: "profile-unavailable" });
+    return null;
+  }
+
+  const entry = buildDynamicRegistryEntry({
+    coingeckoId: profile.coingeckoId,
+    symbol: profile.symbol,
+    name: profile.name,
+    chain: profile.chain,
+    contractAddress: profile.contractAddress,
+    githubRepo: profile.githubRepo,
+  });
+
+  let oriResult: OriLookupResult | null = null;
+  try {
+    oriResult = await computeOriForDynamicEntry(entry);
+  } catch {
+    oriResult = null;
+  }
+
+  return assembleSyntheticDetail({
+    symbol: profile.symbol,
+    name: profile.name,
+    chain: profile.chain,
+    coingeckoId: profile.coingeckoId,
+    oriResult,
+    registryStatus: "dynamic",
+  });
 }
 
 export async function getLiveTokenDetail(symbol: string) {
   try {
     const upper = symbol.toUpperCase();
     const baseRaw = TOKEN_RAW_METRICS[upper];
-    if (!baseRaw) return null;
+    if (!baseRaw) {
+      // Curated registry asset without hand-authored static detail → use its
+      // curated provider mappings (never bypass the registry for supported
+      // assets). Otherwise treat the param as a dynamic CoinGecko id.
+      const registryEntry = getRegistryBySymbol(upper);
+      if (registryEntry) {
+        return await getCuratedRegistryDetail(registryEntry);
+      }
+      return await getDynamicTokenDetail(symbol.toLowerCase());
+    }
 
     const ctx = await getLiveContext();
     const price = ctx.prices?.[upper];
@@ -276,16 +561,15 @@ export async function getLiveTokenDetail(symbol: string) {
     const oriResult = await getOriResult(upper);
 
     let raw = enrichRawMetrics(baseRaw, price, chainTvl);
-    let metrics: OriMetrics;
     let confidence = ctx.confidence;
     let source = ctx.source;
 
-    if (oriResult && oriResult.dataMode !== "mock") {
+    if (oriResult) {
       raw = enrichRawFromOri(raw, oriResult);
-      metrics = buildTokenMetricsFromOri(upper, raw, oriResult, price);
       confidence = buildConfidenceFromOri(oriResult, {
         coingecko: ctx.coingecko,
         defillama: ctx.defillama,
+        mockFallback: oriResult.dataMode === "mock",
       });
       source =
         oriResult.dataMode === "live"
@@ -293,16 +577,10 @@ export async function getLiveTokenDetail(symbol: string) {
           : oriResult.dataMode === "partial"
             ? "Estimated"
             : "Mock";
-    } else {
-      metrics = buildTokenMetrics(upper, raw, price);
-      if (oriResult) {
-        confidence = buildConfidenceFromOri(oriResult, {
-          coingecko: ctx.coingecko,
-          defillama: ctx.defillama,
-          mockFallback: true,
-        });
-      }
     }
+
+    const { result, components } = resolveResultAndComponents(upper, raw, oriResult);
+    const metrics = metricsFromResult(result, raw, components);
 
     const liquidityStability = calculateLiquidityStability({
       slippage1m: raw.slippage1m,
@@ -311,22 +589,15 @@ export async function getLiveTokenDetail(symbol: string) {
       lpConcentration: raw.lpConcentration,
     });
 
-    let priceHistory: [number, number][] | null = null;
-    try {
-      priceHistory = await fetchCoinMarketChart(symbol, 30);
-    } catch {
-      priceHistory = null;
-    }
-
-    const mockHistory = getTokenHistory(symbol, metrics.oriScore);
-    const history = priceHistory
-      ? {
-          ori: pricesToHistory(priceHistory, metrics.oriScore),
-          liquidity: pricesToHistory(priceHistory, liquidityStability),
-          marketIntegrity: pricesToHistory(priceHistory, metrics.marketIntegrity),
-          smartMoney: mockHistory.smartMoney,
-        }
-      : mockHistory;
+    // ORI history is single-sourced from the canonical ORIResult so the last
+    // point always equals the displayed current score. Component charts use the
+    // same deterministic generator anchored to their current values.
+    const history = {
+      ori: historyToPoints(result.history),
+      liquidity: historyToPoints(buildSeries(upper, liquidityStability)),
+      marketIntegrity: historyToPoints(buildSeries(upper, metrics.marketIntegrity)),
+      smartMoney: historyToPoints(buildSeries(upper, metrics.smartMoneyPositioning)),
+    };
 
     return {
       metrics: { ...metrics, liquidityStability },
@@ -337,6 +608,7 @@ export async function getLiveTokenDetail(symbol: string) {
       confidence,
       source,
       oriResult,
+      oriResultNormalized: result,
       livePrice: price
         ? {
             usd: price.usd,
@@ -355,7 +627,8 @@ export async function getLiveTokenDetail(symbol: string) {
     };
   } catch {
     const { getTokenDetail } = await import("@/lib/tokenData");
-    return getTokenDetail(symbol);
+    const legacy = getTokenDetail(symbol);
+    return legacy ? { ...legacy, source: "Mock" as LiveDataSource } : null;
   }
 }
 

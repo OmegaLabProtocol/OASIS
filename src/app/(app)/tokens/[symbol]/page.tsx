@@ -1,12 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { TOKEN_SYMBOLS } from "@/lib/constants";
-import { ScoreGauge } from "@/components/ScoreGauge";
-import { RiskBadge } from "@/components/RiskBadge";
 import { RiskChangeExplanation } from "@/components/RiskChangeExplanation";
 import { DataConfidenceBadge } from "@/components/DataConfidenceBadge";
 import { ScoreBreakdownChart } from "@/components/ScoreBreakdownChart";
 import { HistoricalChart } from "@/components/HistoricalChart";
+import { TokenScorePanel } from "@/components/TokenScorePanel";
+import { TokenOriHistoryChart } from "@/components/TokenOriHistoryChart";
 import { AIInsightCard } from "@/components/AIInsightCard";
 import {
   ORIIntelligenceReport,
@@ -43,6 +43,8 @@ export default async function TokenPage({
   const { metrics, raw, history, commentary, brief, confidence } = detail;
   const dataSource = "source" in detail ? detail.source : undefined;
   const oriResult = "oriResult" in detail ? detail.oriResult : null;
+  const oriResultNormalized =
+    "oriResultNormalized" in detail ? detail.oriResultNormalized : undefined;
   const components: OriComponentScores = {
     liquidityStability: metrics.liquidityStability,
     marketIntegrity: metrics.marketIntegrity,
@@ -91,11 +93,12 @@ export default async function TokenPage({
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-1">
           <CardContent className="flex flex-col items-center pt-6 pb-6">
-            <ScoreGauge score={metrics.oriScore} size="lg" />
-            <RiskBadge
-              label={metrics.riskLabel}
+            <TokenScorePanel
+              symbol={metrics.symbol}
               score={metrics.oriScore}
-              className="mt-4 w-full max-w-[220px]"
+              label={metrics.riskLabel}
+              initial={oriResultNormalized}
+              badgeClassName="mt-4 w-full max-w-[220px]"
             />
             <p className="mt-2 text-xs text-muted-foreground text-center">
               Omega Risk Index — proprietary institutional benchmark
@@ -141,7 +144,12 @@ export default async function TokenPage({
       <AIInsightCard summary={commentary.summary} />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <HistoricalChart data={history.ori} title="ORI Score Over Time" />
+        <TokenOriHistoryChart
+          symbol={metrics.symbol}
+          initial={oriResultNormalized}
+          fallbackData={history.ori}
+          title="ORI Score Over Time"
+        />
         <HistoricalChart
           data={history.liquidity}
           title="Liquidity Stability"

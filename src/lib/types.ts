@@ -1,11 +1,8 @@
 export type RiskLabel =
   | "Institutional Grade"
-  | "Strategic Grade"
-  | "Established"
-  | "Developing"
-  | "Speculative"
-  | "High Risk"
-  | "Distressed";
+  | "Moderate Risk"
+  | "Elevated Risk"
+  | "High Risk";
 
 export type DataSourceType = "Mock" | "Public API" | "Estimated";
 export type ConfidenceLevel = "High" | "Medium" | "Low";

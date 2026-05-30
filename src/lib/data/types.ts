@@ -159,7 +159,48 @@ export type SupportedChain =
   | "optimism"
   | "base"
   | "polygon"
-  | "bsc";
+  | "bsc"
+  | "bitcoin"
+  | "solana"
+  | "avalanche"
+  | "cardano"
+  | "ripple"
+  | "dogecoin"
+  | "cosmos"
+  | "near"
+  | "injective"
+  | "thorchain";
+
+export type ProtocolCategory =
+  | "L1"
+  | "L2"
+  | "DEX"
+  | "Lending"
+  | "Liquid Staking"
+  | "Oracle"
+  | "Derivatives"
+  | "Payments"
+  | "Meme"
+  | "Interoperability"
+  | "Stablecoin/CDP";
+
+export type MarketTier = "large" | "mid" | "small";
+
+export type ExplorerType = "etherscan" | "blockscout" | "none";
+
+/** Canonical provider identifier mappings — used instead of querying by ticker. */
+export interface ProviderMappings {
+  /** DeFiLlama protocol slug. */
+  defillama?: string | null;
+  /** Snapshot space (off-chain governance). */
+  snapshot?: string | null;
+  /** Tally governor id (on-chain governance). */
+  tally?: string | null;
+  /** GitHub `owner/repo` for developer activity. */
+  github?: string | null;
+  /** Block explorer family used for holder/contract enrichment. */
+  explorerType: ExplorerType;
+}
 
 export interface TokenRegistryEntry {
   symbol: string;
@@ -167,9 +208,14 @@ export interface TokenRegistryEntry {
   chain: SupportedChain;
   /** Contract address; null for native chain tokens */
   address: string | null;
+  protocolCategory: ProtocolCategory;
+  marketTier: MarketTier;
   coingeckoId: string;
-  defillamaProtocolSlug?: string;
-  githubRepo?: string;
-  snapshotSpace?: string;
-  tallyGovernor?: string;
+  providerMappings: ProviderMappings;
+  /**
+   * Whether the token is fully wired into dashboard/detail rendering.
+   * The registry intentionally carries broader identity coverage than the
+   * rendered universe; non-tracked entries are still resolvable + enrichable.
+   */
+  tracked: boolean;
 }

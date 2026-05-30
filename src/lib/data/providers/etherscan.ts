@@ -1,9 +1,8 @@
 import { nowIso, providerFetch, providerMeta } from "../fetch";
 import type { HolderDistributionData, SupportedChain } from "../types";
 
-const EXPLORER_BASE: Record<
-  SupportedChain,
-  { url: string; chainId: number } | undefined
+const EXPLORER_BASE: Partial<
+  Record<SupportedChain, { url: string; chainId: number }>
 > = {
   ethereum: { url: "https://api.etherscan.io/api", chainId: 1 },
   arbitrum: { url: "https://api.arbiscan.io/api", chainId: 42161 },

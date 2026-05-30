@@ -3,36 +3,37 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { OriChange24h } from "@/components/OriChange24h";
 import { RiskBadge } from "@/components/RiskBadge";
 import { ScoreGauge } from "@/components/ScoreGauge";
-import type { OriMetrics } from "@/lib/types";
+import type { ORIResult } from "@/lib/ori/types";
+import type { RiskLabel } from "@/lib/types";
 import { ArrowRight } from "lucide-react";
 
-export function OriScoreCard({ token }: { token: OriMetrics }) {
+export function OriScoreCard({ result }: { result: ORIResult }) {
   return (
-    <Link href={`/tokens/${token.symbol}`} className="block h-full min-w-0">
+    <Link href={`/tokens/${result.symbol}`} className="block h-full min-w-0">
       <Card className="group h-full min-w-0 overflow-hidden transition-colors hover:border-foreground/20">
         <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
           <div className="min-w-0">
-            <CardTitle className="text-base font-medium">{token.symbol}</CardTitle>
-            <p className="truncate text-xs text-muted-foreground">{token.name}</p>
+            <CardTitle className="text-base font-medium">{result.symbol}</CardTitle>
+            <p className="truncate text-xs text-muted-foreground">{result.name}</p>
           </div>
           <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
         </CardHeader>
         <CardContent className="min-w-0 space-y-3">
           <div className="flex min-w-0 items-start gap-2">
             <div className="shrink-0">
-              <ScoreGauge score={token.oriScore} size="sm" />
+              <ScoreGauge score={result.currentScore} size="sm" />
             </div>
             <div className="flex min-w-0 flex-1 flex-col items-stretch gap-1">
-              <RiskBadge label={token.riskLabel} score={token.oriScore} />
+              <RiskBadge label={result.grade as RiskLabel} score={result.currentScore} />
               <OriChange24h
-                change={token.change24h}
+                change={result.percentChange ?? 0}
                 className="text-right"
                 decimals={1}
               />
             </div>
           </div>
           <p className="line-clamp-2 min-w-0 text-[10px] leading-snug text-muted-foreground">
-            {token.topRiskDriver}
+            {result.note}
           </p>
         </CardContent>
       </Card>

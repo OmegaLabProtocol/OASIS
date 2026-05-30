@@ -7,6 +7,10 @@ import {
 } from "@/lib/data/protocolPersonality";
 import type { MockFallbackUsage } from "@/lib/data/mockOriResolver";
 import type { TierProfile } from "@/lib/data/mockOriTiers";
+import {
+  applyInstitutionalCalibration,
+  getInstitutionalBand,
+} from "./institutionalCalibration";
 import { clampScore } from "./utils";
 
 const CATEGORY_KEYS = [
@@ -95,6 +99,20 @@ export function calibrateOriScore(
   const mockCount = CATEGORY_KEYS.filter(
     (k) => provenance[k] === "mock" || provenance[k] === "estimated"
   ).length;
+
+  // Institutional calibration guardrail for listed blue-chip assets. Takes
+  // precedence over personality-only calibration. When coverage is fully live it
+  // is a no-op (real API data wins); otherwise it biases the estimated/mock
+  // portion toward a deterministic institutional band so majors are not
+  // underrated by incomplete API coverage. Confidence is reduced elsewhere.
+  if (getInstitutionalBand(symbol)) {
+    return applyInstitutionalCalibration(
+      oriScore,
+      symbol,
+      liveCount,
+      CATEGORY_KEYS.length
+    );
+  }
 
   // Strong live coverage with healthy raw score — trust formula output
   if (liveCount >= 5 && oriScore >= personality.oriFloor) {

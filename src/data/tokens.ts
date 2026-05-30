@@ -216,6 +216,24 @@ export const PREVIOUS_ORI_SCORES: Record<string, number> = {
   OP: 68,
 };
 
+export function getPrimaryRiskDriver(symbol: string): string {
+  return RISK_CHANGE_ATTRIBUTION[symbol.toUpperCase()]?.[0] ?? "Volatility spike";
+}
+
+/** Centralized 7-day ORI change reference (display-only supplementary metric). */
+export const ORI_CHANGE_7D: Record<string, number> = {
+  ETH: -2.1,
+  SOL: 1.4,
+  ARB: -0.8,
+  UNI: -1.2,
+  AAVE: 0.6,
+  OP: -3.5,
+};
+
+export function get7dChange(symbol: string): number {
+  return ORI_CHANGE_7D[symbol.toUpperCase()] ?? 0;
+}
+
 export const RISK_CHANGE_ATTRIBUTION: Record<string, string[]> = {
   ETH: [
     "Exchange inflows rising",

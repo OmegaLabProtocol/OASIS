@@ -1,4 +1,3 @@
-import { OriScoreCard } from "@/components/OriScoreCard";
 import { MarketRiskMeter } from "@/components/MarketRiskMeter";
 import { AlertCard } from "@/components/AlertCard";
 import { AIInsightCard } from "@/components/AIInsightCard";
@@ -6,29 +5,26 @@ import { WatchlistPanel } from "@/components/WatchlistPanel";
 import { WalletActivityFeed } from "@/components/WalletActivityFeed";
 import { ProtocolHealthCard } from "@/components/ProtocolHealthCard";
 import { DataConfidenceBadge } from "@/components/DataConfidenceBadge";
+import { DashboardOriOverview } from "@/components/DashboardOriOverview";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { ORI_BENCHMARK_COPY } from "@/lib/constants";
-import { OriChange24h } from "@/components/OriChange24h";
 import {
   getLiveMarketOverview,
   getLiveProtocols,
   getLiveWallets,
 } from "@/services/dataService";
+import { buildAllORIResults } from "@/lib/ori/service";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [market, protocols, wallets] = await Promise.all([
+  const [market, protocols, wallets, oriResults] = await Promise.all([
     getLiveMarketOverview(),
     getLiveProtocols(),
     getLiveWallets(),
+    buildAllORIResults(),
   ]);
-
-  const sortedByChange = [...market.tokens].sort(
-    (a, b) => Math.abs(b.change24h) - Math.abs(a.change24h)
-  );
 
   return (
     <div className="space-y-6">
@@ -59,61 +55,11 @@ export default async function DashboardPage() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-4">
-          <div>
-            <h2 className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
-              Asset ORI Overview
-            </h2>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0">
-              {market.tokens.map((t) => (
-                <OriScoreCard key={t.symbol} token={t} />
-              ))}
-            </div>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground">
-                Trending by ORI Change (24h)
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="w-full">
-              <div className="grid w-full grid-cols-[1fr_1fr_1fr_2fr] items-center gap-x-6 border-b border-border pb-2 text-[10px] uppercase tracking-wider text-muted-foreground">
-                <span>Asset</span>
-                <span className="text-right">ORI</span>
-                <span className="text-right">24h</span>
-                <span>Driver</span>
-              </div>
-              <div className="divide-y divide-border/50">
-                {sortedByChange.map((t) => (
-                  <Link
-                    key={t.symbol}
-                    href={`/tokens/${t.symbol}`}
-                    className="grid w-full grid-cols-[1fr_1fr_1fr_2fr] items-center gap-x-6 py-2.5 text-sm transition-colors hover:bg-muted/50"
-                  >
-                    <span className="font-medium">{t.symbol}</span>
-                    <span className="font-mono text-right tabular-nums">
-                      {t.oriScore}
-                    </span>
-                    <OriChange24h
-                      change={t.change24h}
-                      className="text-right"
-                      decimals={1}
-                    />
-                    <Badge
-                      variant="outline"
-                      className="w-full min-w-0 justify-center truncate text-[9px]"
-                    >
-                      {t.topRiskDriver}
-                    </Badge>
-                  </Link>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <DashboardOriOverview initialResults={oriResults} />
         </div>
 
         <div className="space-y-4">
-          <WatchlistPanel />
+          <WatchlistPanel initialResults={oriResults} />
           <Card>
             <CardHeader>
               <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground">

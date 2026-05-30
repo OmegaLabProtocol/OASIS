@@ -23,7 +23,7 @@ export const ORI_TIER_SCALE: OriTier[] = [
   },
   {
     min: 80,
-    label: "Strategic Grade",
+    label: "Institutional Grade",
     color: "#34C759",
     pillTextColor: "#8AD9A8",
     fillColor: "#0C2218",
@@ -31,7 +31,7 @@ export const ORI_TIER_SCALE: OriTier[] = [
   },
   {
     min: 70,
-    label: "Established",
+    label: "Moderate Risk",
     color: "#84CC16",
     pillTextColor: "#B8D96A",
     fillColor: "#1A2208",
@@ -39,7 +39,7 @@ export const ORI_TIER_SCALE: OriTier[] = [
   },
   {
     min: 60,
-    label: "Developing",
+    label: "Moderate Risk",
     color: "#FACC15",
     pillTextColor: "#E8D078",
     fillColor: "#221C06",
@@ -47,7 +47,7 @@ export const ORI_TIER_SCALE: OriTier[] = [
   },
   {
     min: 50,
-    label: "Speculative",
+    label: "Elevated Risk",
     color: "#FB923C",
     pillTextColor: "#E8B088",
     fillColor: "#221408",
@@ -55,7 +55,7 @@ export const ORI_TIER_SCALE: OriTier[] = [
   },
   {
     min: 40,
-    label: "High Risk",
+    label: "Elevated Risk",
     color: "#F97316",
     pillTextColor: "#E8A070",
     fillColor: "#221006",
@@ -63,7 +63,7 @@ export const ORI_TIER_SCALE: OriTier[] = [
   },
   {
     min: 0,
-    label: "Distressed",
+    label: "High Risk",
     color: "#DC2626",
     pillTextColor: "#E89898",
     fillColor: "#220808",
