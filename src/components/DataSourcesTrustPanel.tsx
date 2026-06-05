@@ -13,6 +13,8 @@ import { cn } from "@/lib/utils";
 const PROVIDER_DESCRIPTIONS: Record<string, string> = {
   CoinGecko: "Market data — price, market cap, volume, supply",
   DeFiLlama: "TVL, revenue, fees, protocol fundamentals",
+  CryptoRank:
+    "Token unlocks, supply schedule, dilution, funding history, investor exposure, market maturity",
   "Chain Explorer": "Holder count, concentration, contract verification",
   Snapshot: "Governance proposals and voting activity",
   Tally: "DAO governance and delegation data",
@@ -37,6 +39,7 @@ export function DataSourcesTrustPanel({ oriResult }: DataSourcesTrustPanelProps)
   const sources = oriResult?.sources ?? [
     { name: "CoinGecko", usedFor: ["price", "market cap", "volume", "supply"], lastUpdated: new Date().toISOString(), available: false },
     { name: "DeFiLlama", usedFor: ["TVL", "revenue", "fees"], lastUpdated: new Date().toISOString(), available: false },
+    { name: "CryptoRank", usedFor: ["token unlocks", "supply schedule", "funding history"], lastUpdated: new Date().toISOString(), available: false },
     { name: "Chain Explorer", usedFor: ["holders", "contract data"], lastUpdated: new Date().toISOString(), available: false },
     { name: "Snapshot", usedFor: ["governance"], lastUpdated: new Date().toISOString(), available: false },
     { name: "Tally", usedFor: ["DAO governance"], lastUpdated: new Date().toISOString(), available: false },

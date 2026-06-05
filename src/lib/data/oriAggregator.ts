@@ -5,13 +5,20 @@ import { fetchHolderDistribution } from "./providers/etherscan";
 import { fetchSnapshotGovernance } from "./providers/snapshot";
 import { fetchTallyGovernance } from "./providers/tally";
 import { fetchDeveloperActivity } from "./providers/github";
+import { fetchCryptoRankData } from "./providers/cryptorank";
 import { applyMockFallbacks } from "./mockOriResolver";
 import {
   getRegistryByChainAddress,
   getRegistryBySymbol,
   resolveNativeAddress,
 } from "./tokenRegistry";
-import type { NormalizedTokenData, OriLookupResult, TokenRegistryEntry } from "./types";
+import type {
+  CryptoRankData,
+  NormalizedTokenData,
+  TokenMarketData,
+  OriLookupResult,
+  TokenRegistryEntry,
+} from "./types";
 import { computeOriFromNormalizedData } from "@/lib/scoring/ori";
 import { oriLog } from "@/services/ori/cache";
 
@@ -25,7 +32,7 @@ export async function fetchNormalizedTokenData(
 ): Promise<NormalizedTokenData> {
   const { providerMappings: m } = entry;
 
-  const [market, protocol, holders, governance, tally, developer] =
+  const [market, protocol, holders, governance, tally, developer, cryptorank] =
     await Promise.all([
       fetchTokenMarketData(entry.coingeckoId),
       m.defillama
@@ -41,9 +48,52 @@ export async function fetchNormalizedTokenData(
       m.github
         ? fetchDeveloperActivity(m.github)
         : Promise.resolve(null),
+      fetchCryptoRankData({ slug: m.cryptorank ?? null, symbol: entry.symbol }),
     ]);
 
-  return { market, protocol, holders, governance, tally, developer };
+  // Supplemental priority: CoinGecko → DeFiLlama → CryptoRank. CryptoRank only
+  // backfills supply fields that CoinGecko did not return; it never overwrites
+  // live CoinGecko values. The filled values are still live (real API), so
+  // provenance stays honest while avoiding a mock estimate.
+  const mergedMarket = backfillSupplyFromCryptoRank(market, cryptorank);
+
+  return {
+    market: mergedMarket,
+    protocol,
+    holders,
+    governance,
+    tally,
+    developer,
+    cryptorank,
+  };
+}
+
+function backfillSupplyFromCryptoRank(
+  market: TokenMarketData | null,
+  cryptorank: CryptoRankData | null
+): TokenMarketData | null {
+  if (!market || !cryptorank) return market;
+
+  const needsSupply =
+    market.circulatingSupply == null ||
+    market.totalSupply == null ||
+    market.fdv == null;
+  if (!needsSupply) return market;
+
+  const circulatingSupply =
+    market.circulatingSupply ?? cryptorank.circulatingSupply ?? null;
+  const totalSupply = market.totalSupply ?? cryptorank.totalSupply ?? null;
+  const fdv = market.fdv ?? cryptorank.fdv ?? null;
+
+  if (
+    circulatingSupply === market.circulatingSupply &&
+    totalSupply === market.totalSupply &&
+    fdv === market.fdv
+  ) {
+    return market;
+  }
+
+  return { ...market, circulatingSupply, totalSupply, fdv };
 }
 
 function logEnrichment(
@@ -66,6 +116,7 @@ function logEnrichment(
       snapshot: m.snapshot ?? null,
       tally: m.tally ?? null,
       github: m.github ?? null,
+      cryptorank: m.cryptorank ?? null,
     },
     results: {
       coingecko: data.market?.price != null ? "success" : "missing",
@@ -74,6 +125,7 @@ function logEnrichment(
       snapshot: data.governance?.proposalCount != null ? "success" : "missing",
       tally: data.tally?.proposalCount != null ? "success" : "missing",
       github: data.developer != null ? "success" : "missing",
+      cryptorank: data.cryptorank?.meta?.available ? "success" : "missing",
     },
     mockCategories: mockCategories.length > 0 ? mockCategories : "none",
   });

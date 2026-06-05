@@ -435,6 +435,7 @@ export function buildDynamicRegistryEntry(input: {
       snapshot: null,
       tally: null,
       github: input.githubRepo ?? null,
+      cryptorank: null,
       explorerType,
     },
     tracked: false,

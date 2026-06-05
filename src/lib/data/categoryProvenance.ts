@@ -53,11 +53,19 @@ export function detectCategoryProvenance(
           ? "mock"
           : "unavailable";
 
-  // Supply — can be partial when market is live but supply fields filled
+  // Supply — can be partial when market is live but supply fields filled.
+  // CryptoRank is a live supplemental source for supply / unlock signal.
+  const cryptoRankSupplyLive =
+    isLiveSource(raw.cryptorank?.source) &&
+    (raw.cryptorank?.circulatingSupply != null ||
+      raw.cryptorank?.lockedSupplyPercent != null ||
+      raw.cryptorank?.nextUnlockPercentOfSupply != null);
+
   const supplyLive =
-    isLiveSource(raw.market?.source) &&
-    raw.market?.circulatingSupply != null &&
-    raw.market?.totalSupply != null;
+    (isLiveSource(raw.market?.source) &&
+      raw.market?.circulatingSupply != null &&
+      raw.market?.totalSupply != null) ||
+    cryptoRankSupplyLive;
 
   const supplyPartial =
     !supplyLive &&

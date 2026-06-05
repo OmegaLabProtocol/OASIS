@@ -37,6 +37,7 @@ function cloneData(data: NormalizedTokenData): NormalizedTokenData {
     governance: data.governance ? { ...data.governance } : null,
     tally: data.tally ? { ...data.tally } : null,
     developer: data.developer ? { ...data.developer } : null,
+    cryptorank: data.cryptorank ? { ...data.cryptorank } : null,
   };
 }
 

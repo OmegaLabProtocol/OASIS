@@ -75,6 +75,11 @@ function buildSources(data: NormalizedTokenData): OriSourceRecord[] {
 
   add("CoinGecko", ["price", "market cap", "volume", "supply", "FDV"], data.market);
   add("DeFiLlama", ["TVL", "revenue", "fees", "protocol fundamentals"], data.protocol);
+  add(
+    "CryptoRank",
+    ["token unlocks", "supply schedule", "dilution", "funding history", "investor exposure", "market maturity"],
+    data.cryptorank ?? null
+  );
   add("Chain Explorer", ["holders", "concentration", "contract verification"], data.holders);
   add("Snapshot", ["governance proposals", "voting activity"], data.governance);
   add("Tally", ["DAO governance", "delegation"], data.tally);
@@ -105,7 +110,7 @@ export function computeOriFromNormalizedData(
   const holderResult = scoreHolderDistribution(data.holders);
   const governanceResult = scoreGovernance(data.governance, data.tally);
   const developerResult = scoreDeveloperActivity(data.developer);
-  const supplyResult = scoreSupplyRisk(data.market);
+  const supplyResult = scoreSupplyRisk(data.market, data.cryptorank);
 
   const rawScores: Record<keyof OriCategoryScores, number | null> = {
     marketLiquidity: marketResult.score,
@@ -130,6 +135,17 @@ export function computeOriFromNormalizedData(
   >;
   for (const key of Object.keys(calibratedScores) as (keyof OriCategoryScores)[]) {
     fieldProvenance[key] = buildFieldProvenance(rawData, data, key);
+  }
+
+  // Surface CryptoRank-sourced supply/unlock signal as live provenance fields.
+  const cryptoRankFieldsUsed = supplyResult.cryptoRankFieldsUsed.map(
+    (f) => `${f} (CryptoRank)`
+  );
+  if (cryptoRankFieldsUsed.length > 0) {
+    const existing = fieldProvenance.supplyRisk.liveFields;
+    fieldProvenance.supplyRisk.liveFields = [
+      ...new Set([...existing, ...cryptoRankFieldsUsed]),
+    ];
   }
 
   let categoryMetadata = buildCategoryMetadata(
@@ -208,6 +224,7 @@ export function computeOriFromNormalizedData(
     mockDataDisclaimer: buildMockDataDisclaimer(mockCategories),
     categoryProvenance: categoryProvenance as Record<keyof OriCategoryScores, string>,
     fieldProvenance,
+    cryptoRankFieldsUsed,
   };
 }
 

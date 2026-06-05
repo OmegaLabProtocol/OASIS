@@ -73,6 +73,43 @@ export interface DeveloperActivityData {
   meta?: ProviderMeta;
 }
 
+/**
+ * Supplemental tokenomics data sourced from CryptoRank. Used only to enrich
+ * existing ORI categories (primarily supply / dilution risk) — never to create
+ * new categories. Every field is nullable so missing data degrades gracefully.
+ */
+export interface CryptoRankData {
+  /** Circulating supply (units). */
+  circulatingSupply: number | null;
+  /** Total supply (units). */
+  totalSupply: number | null;
+  /** Max supply (units), when capped. */
+  maxSupply: number | null;
+  marketCap: number | null;
+  fdv: number | null;
+  /** circulating / total, 0–1. */
+  circulatingToTotalRatio: number | null;
+  /** % of supply not yet circulating (0–100) — token unlock overhang. */
+  lockedSupplyPercent: number | null;
+  /** Date of the next scheduled token unlock, if known. */
+  nextUnlockDate: string | null;
+  /** Size of the next unlock as % of total supply (0–100) — dilution pressure. */
+  nextUnlockPercentOfSupply: number | null;
+  /** Total capital raised across funding rounds (USD) — funding history. */
+  totalFundingUsd: number | null;
+  /** Number of disclosed funding rounds. */
+  fundingRoundsCount: number | null;
+  /** Number of disclosed investors — institutional / VC exposure. */
+  investorsCount: number | null;
+  /** First listing / trading date — market maturity. */
+  listedSince: string | null;
+  /** Age in days derived from listing date — market maturity. */
+  ageDays: number | null;
+  source: string;
+  lastUpdated: string;
+  meta?: ProviderMeta;
+}
+
 export interface OriCategoryScores {
   marketLiquidity: number;
   protocolFundamentals: number;
@@ -142,6 +179,8 @@ export interface OriLookupResult {
   mockDataDisclaimer: string;
   categoryProvenance?: Record<keyof OriCategoryScores, string>;
   fieldProvenance?: Record<keyof OriCategoryScores, CategoryFieldProvenance>;
+  /** CryptoRank fields that contributed to scoring (supply / unlock / dilution). */
+  cryptoRankFieldsUsed?: string[];
 }
 
 export interface NormalizedTokenData {
@@ -151,6 +190,8 @@ export interface NormalizedTokenData {
   governance: GovernanceData | null;
   developer: DeveloperActivityData | null;
   tally: GovernanceData | null;
+  /** Supplemental CryptoRank tokenomics; optional so existing call sites are unaffected. */
+  cryptorank?: CryptoRankData | null;
 }
 
 export type SupportedChain =
@@ -198,6 +239,8 @@ export interface ProviderMappings {
   tally?: string | null;
   /** GitHub `owner/repo` for developer activity. */
   github?: string | null;
+  /** CryptoRank currency slug ("key") for tokenomics enrichment. */
+  cryptorank?: string | null;
   /** Block explorer family used for holder/contract enrichment. */
   explorerType: ExplorerType;
 }
