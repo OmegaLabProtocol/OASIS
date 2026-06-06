@@ -9,6 +9,9 @@ import type { ORIResult } from "@/lib/ori/types";
 /** The single SWR key shared by every ORI hook. */
 export const ORI_LIST_KEY = "ori-results";
 
+/** SWR key for the dashboard Asset ORI Overview (core + trending selection). */
+export const ORI_ASSET_OVERVIEW_KEY = "asset-overview-ori";
+
 /**
  * One refresh cadence for all surfaces. 30s satisfies the dashboard (30–60s)
  * and the token detail page (30s) while keeping a single synchronized cycle.

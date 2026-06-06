@@ -5,7 +5,7 @@ import { OriScoreCard } from "@/components/OriScoreCard";
 import { OriChange24h } from "@/components/OriChange24h";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useORI } from "@/hooks/useOri";
+import { useAssetOverviewORI } from "@/hooks/useAssetOverviewOri";
 import { getPrimaryRiskDriver } from "@/data/tokens";
 import type { ORIResult } from "@/lib/ori/types";
 
@@ -14,7 +14,7 @@ export function DashboardOriOverview({
 }: {
   initialResults: ORIResult[];
 }) {
-  const { results } = useORI(initialResults);
+  const { results } = useAssetOverviewORI(initialResults);
 
   const sortedByChange = [...results].sort(
     (a, b) => Math.abs(b.percentChange ?? 0) - Math.abs(a.percentChange ?? 0)

@@ -28,3 +28,26 @@ export async function fetchAllORIResults(): Promise<ORIResult[]> {
   oriLog("refresh:success", { count: results.length });
   return results;
 }
+
+/** Client fetch for the Asset ORI Overview token set (core + trending). */
+export async function fetchAssetOverviewORIResults(): Promise<ORIResult[]> {
+  oriLog("refresh:start", { scope: "asset-overview" });
+  let res: Response;
+  try {
+    res = await fetch("/api/asset-overview");
+  } catch (err) {
+    oriLog("refresh:error", { scope: "asset-overview", error: String(err) });
+    throw err;
+  }
+
+  if (!res.ok) {
+    oriLog("refresh:error", { scope: "asset-overview", status: res.status });
+    throw new Error(`Asset overview ORI fetch failed: ${res.status}`);
+  }
+
+  const data = await res.json();
+  const results: ORIResult[] = data.results ?? [];
+  logFallbackUsage(results);
+  oriLog("refresh:success", { scope: "asset-overview", count: results.length });
+  return results;
+}

@@ -15,10 +15,12 @@ import {
   roundScore,
 } from "./grade";
 import { buildHistory, previousScoreFromHistory } from "./history";
-import type { ORIResult } from "./types";
+import { resolveAssetTier } from "@/lib/data/mockOriTiers";
+import type { ORIResult, TokenIdentity } from "./types";
 
 /** Deterministic baseline ORI per token when nothing live is available. */
 const FALLBACK_BASELINE: Record<string, number> = {
+  BTC: 96,
   ETH: 88,
   SOL: 76,
   ARB: 71,
@@ -27,12 +29,36 @@ const FALLBACK_BASELINE: Record<string, number> = {
   OP: 68,
 };
 
-export function buildFallbackResult(idOrSymbol: string): ORIResult | null {
-  const identity = resolveToken(idOrSymbol);
-  if (!identity) return null;
+function estimateMcapFromRank(rank?: number | null): number {
+  if (rank == null) return 0;
+  if (rank <= 10) return 150_000_000_000;
+  if (rank <= 50) return 10_000_000_000;
+  if (rank <= 200) return 2_000_000_000;
+  if (rank <= 500) return 800_000_000;
+  return 100_000_000;
+}
 
+function baselineForIdentity(
+  identity: TokenIdentity,
+  marketCapRank?: number | null
+): number {
+  const curated = FALLBACK_BASELINE[identity.symbol];
+  if (curated != null) return curated;
+
+  const tier = resolveAssetTier({
+    symbol: identity.symbol,
+    marketCap: estimateMcapFromRank(marketCapRank),
+  });
+  return Math.round((tier.oriRange[0] + tier.oriRange[1]) / 2);
+}
+
+/** Deterministic fallback for any token identity (curated or dynamic). */
+export function buildFallbackFromIdentity(
+  identity: TokenIdentity,
+  marketCapRank?: number | null
+): ORIResult {
   const { symbol } = identity;
-  const current = roundScore(FALLBACK_BASELINE[symbol] ?? 60);
+  const current = roundScore(baselineForIdentity(identity, marketCapRank));
   const baselineAnchor = PREVIOUS_ORI_SCORES[symbol] ?? current;
   const history = buildHistory(symbol, current, baselineAnchor);
   const previous = previousScoreFromHistory(history);
@@ -54,4 +80,10 @@ export function buildFallbackResult(idOrSymbol: string): ORIResult | null {
     dataSource: "fallback",
     refreshStatus: "stale",
   };
+}
+
+export function buildFallbackResult(idOrSymbol: string): ORIResult | null {
+  const identity = resolveToken(idOrSymbol);
+  if (!identity) return null;
+  return buildFallbackFromIdentity(identity);
 }

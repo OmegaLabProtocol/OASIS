@@ -13,18 +13,23 @@ import {
   getLiveProtocols,
   getLiveWallets,
 } from "@/services/dataService";
-import { buildAllORIResults } from "@/lib/ori/service";
+import {
+  buildAllORIResults,
+  buildAssetOverviewORIResults,
+} from "@/lib/ori/service";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [market, protocols, wallets, oriResults] = await Promise.all([
-    getLiveMarketOverview(),
-    getLiveProtocols(),
-    getLiveWallets(),
-    buildAllORIResults(),
-  ]);
+  const [market, protocols, wallets, overviewResults, watchlistResults] =
+    await Promise.all([
+      getLiveMarketOverview(),
+      getLiveProtocols(),
+      getLiveWallets(),
+      buildAssetOverviewORIResults(),
+      buildAllORIResults(),
+    ]);
 
   return (
     <div className="space-y-6">
@@ -55,11 +60,11 @@ export default async function DashboardPage() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-4">
-          <DashboardOriOverview initialResults={oriResults} />
+          <DashboardOriOverview initialResults={overviewResults} />
         </div>
 
         <div className="space-y-4">
-          <WatchlistPanel initialResults={oriResults} />
+          <WatchlistPanel initialResults={watchlistResults} />
           <Card>
             <CardHeader>
               <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground">

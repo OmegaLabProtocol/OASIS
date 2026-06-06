@@ -22,7 +22,11 @@ import {
   roundScore,
 } from "./grade";
 import { buildHistory, previousScoreFromHistory } from "./history";
-import { buildFallbackResult } from "./fallback";
+import { buildFallbackFromIdentity, buildFallbackResult } from "./fallback";
+import {
+  getAssetOverviewTokens,
+  type AssetOverviewToken,
+} from "@/lib/data/assetOverviewTokens";
 import { oriLog } from "@/services/ori/cache";
 import type { ORIDataSource, ORIResult, TokenIdentity } from "./types";
 
@@ -137,4 +141,49 @@ export async function buildAllORIResults(): Promise<ORIResult[]> {
   const ids = getAllTokenIds();
   const results = await Promise.all(ids.map((id) => buildORIResult(id)));
   return results.filter((r): r is ORIResult => r !== null);
+}
+
+async function buildOverviewORIResult(
+  token: AssetOverviewToken
+): Promise<ORIResult> {
+  let result =
+    (await buildORIResult(token.oriKey)) ??
+    (await buildORIResult(token.symbol));
+
+  if (result) return result;
+
+  const identity = resolveToken(token.symbol);
+  if (identity) {
+    oriLog("fallback:used", {
+      symbol: token.symbol,
+      reason: "overview-no-lookup",
+    });
+    return buildFallbackFromIdentity(identity);
+  }
+
+  oriLog("fallback:used", {
+    symbol: token.symbol,
+    coingeckoId: token.coingeckoId,
+    reason: "overview-dynamic",
+  });
+  return buildFallbackFromIdentity(
+    {
+      tokenId: token.coingeckoId,
+      symbol: token.symbol,
+      name: token.name,
+      chain: token.chain,
+    },
+    token.marketCapRank
+  );
+}
+
+/**
+ * Resolve ORI results for the Asset ORI Overview grid only.
+ *
+ * Fixed order: BTC, ETH, SOL, then three CoinGecko trending tokens (or static
+ * fallback). Does not alter the broader tracked-token universe used elsewhere.
+ */
+export async function buildAssetOverviewORIResults(): Promise<ORIResult[]> {
+  const tokens = await getAssetOverviewTokens();
+  return Promise.all(tokens.map((token) => buildOverviewORIResult(token)));
 }
