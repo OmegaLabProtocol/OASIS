@@ -17,11 +17,14 @@ import { RiskBriefGenerator } from "@/components/RiskBriefGenerator";
 import { AddToWatchlistButton } from "@/components/AddToWatchlistButton";
 import { DataSourcesTrustPanel } from "@/components/DataSourcesTrustPanel";
 import { OriCategoryBreakdown } from "@/components/OriCategoryBreakdown";
+import { AssetProfileCard } from "@/components/AssetProfileCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { COMPONENT_LABELS } from "@/lib/scoring";
 import type { OriComponentScores } from "@/lib/types";
 import { formatNumber } from "@/lib/utils";
 import { getLiveTokenDetail } from "@/services/dataService";
+import { getAssetProfile } from "@/services/assetProfile";
+import { getRegistryBySymbol } from "@/lib/data/tokenRegistry";
 import { ArrowLeft } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -54,6 +57,20 @@ export default async function TokenPage({
     socialSentimentDivergence: metrics.socialSentimentDivergence,
     protocolExposureRisk: metrics.protocolExposureRisk,
   };
+
+  // Asset Profile (CoinMarketCap-backed) — supporting context around ORI.
+  // Slow-changing metadata, resolved + cached independently from market/risk data.
+  // Failure here never affects ORI, market data, charts, or ORION above.
+  const registryEntry = getRegistryBySymbol(metrics.symbol);
+  const assetProfile = await getAssetProfile({
+    symbol: metrics.symbol,
+    name: metrics.name,
+    chain: registryEntry?.chain,
+    registryStatus: registryEntry ? "curated" : "dynamic",
+    coingeckoId: registryEntry ? undefined : symbol.toLowerCase(),
+    contractAddress: registryEntry?.address ?? undefined,
+    registryCategory: registryEntry?.protocolCategory,
+  });
 
   return (
     <div className="space-y-6">
@@ -138,6 +155,8 @@ export default async function TokenPage({
           confidenceScore={oriResult.confidenceScore}
         />
       )}
+
+      <AssetProfileCard profile={assetProfile} />
 
       <DataSourcesTrustPanel oriResult={oriResult ?? null} />
 

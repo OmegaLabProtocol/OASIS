@@ -2,6 +2,7 @@ import type { AnalystMeta, AnalystTokenContext, OriAnalystIntent } from "./types
 import type { ScreeningRow } from "@/services/copilotContextBuilder";
 import { buildComparisonTable, compareTokens } from "./comparisonEngine";
 import { findComponent } from "./contextBuilder";
+import { buildOasisRiskContext } from "@/services/assetProfile/riskContext";
 import {
   METRIC_DEFINITIONS,
   categoryToMetricKey,
@@ -263,6 +264,9 @@ export function buildCompare(a: AnalystTokenContext, b: AnalystTokenContext): st
     "",
     "## Summary",
     `**${cmp.stronger.symbol}** currently has the stronger institutional profile (ORI **${cmp.stronger.ori.current}** vs **${cmp.weaker.ori.current}**, Δ ${cmp.oriDelta} pts).`,
+    ...(cmp.profileDiffs.length
+      ? ["", "## Profile Differences", ...cmp.profileDiffs.map((d) => `- ${d}`)]
+      : []),
     "",
     "## Comparison Table",
     buildComparisonTable(a, b),
@@ -356,6 +360,188 @@ export function buildRiskMemo(ctx: AnalystTokenContext): string {
     .join("\n");
 }
 
+// ── ASSET PROFILE intents ───────────────────────────────────────────────────
+
+function formatLaunch(iso?: string | null): string {
+  if (!iso) return "Not available";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "Not available";
+  return d.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function profileSourceNote(ctx: AnalystTokenContext): string {
+  const p = ctx.profile;
+  if (!p) return "";
+  return p.isFallback
+    ? "*Profile data: OASIS fallback (CoinMarketCap metadata unavailable).*"
+    : `*Profile data: ${p.profileDataSource}.*`;
+}
+
+function profileUnavailable(ctx: AnalystTokenContext): string {
+  return `Asset profile metadata for **${ctx.symbol}** is currently unavailable from the connected data sources. ORI, market data, and risk analysis remain available above.`;
+}
+
+/** Compact metric row for profile answers, sourced from existing OASIS components. */
+function metricRow(ctx: AnalystTokenContext, key: MetricKey, label: string): string | null {
+  const comp = findComponent(ctx, key);
+  if (!comp) return null;
+  return `| ${label} | ${comp.score}/100 (${comp.tier}) |`;
+}
+
+function relevantMetricsTable(ctx: AnalystTokenContext): string {
+  const rows = [
+    metricRow(ctx, "liquidity", "Liquidity"),
+    metricRow(ctx, "governance", "Governance"),
+    metricRow(ctx, "wallet_concentration", "Wallet Concentration"),
+    metricRow(ctx, "treasury", "Treasury / Protocol"),
+  ].filter(Boolean) as string[];
+  if (!rows.length) return "";
+  return ["| OASIS Metric | Current |", "| --- | --- |", ...rows].join("\n");
+}
+
+export function buildProfileOverview(ctx: AnalystTokenContext): string {
+  const p = ctx.profile;
+  if (!p) return profileUnavailable(ctx);
+
+  const types = p.assetTypes.length ? p.assetTypes.join(" · ") : "Unclassified";
+  const utility = p.utilities.length ? p.utilities.join(" · ") : "Not available";
+  const about =
+    p.shortDescription ??
+    "Detailed project information is not currently available from the connected data sources.";
+
+  return [
+    `## ${p.name} (${p.symbol}) — Asset Profile`,
+    profileSourceNote(ctx),
+    "",
+    types,
+    "",
+    "| Field | Value |",
+    "| --- | --- |",
+    `| Network | ${p.network ?? "Not available"} |`,
+    `| Launched | ${formatLaunch(p.launchDate)} |`,
+    `| Type | ${p.assetTypes[0] ?? "Not available"} |`,
+    `| Primary Utility | ${utility} |`,
+    "",
+    `## About ${p.symbol}`,
+    about,
+    "",
+    "## OASIS Risk Context",
+    buildOasisRiskContext(p.assetTypes, p.symbol),
+    `Current ORI: **${ctx.ori.current}** (${ctx.ori.grade}).`,
+    DISCLAIMER,
+  ].join("\n");
+}
+
+export function buildUtilityExplain(ctx: AnalystTokenContext): string {
+  const p = ctx.profile;
+  if (!p) return profileUnavailable(ctx);
+
+  const utils = p.utilities.map((u) => u.toLowerCase());
+  const utilitySentence = utils.length
+    ? `**${p.name} (${p.symbol})** is primarily associated with ${utils.slice(0, 3).join(", ")}${utils.length > 3 ? "," : ""} within its ecosystem.`
+    : `**${p.name} (${p.symbol})**'s specific token utility is not clearly described by the available metadata.`;
+
+  const table = relevantMetricsTable(ctx);
+  const riskContext = buildOasisRiskContext(p.assetTypes, p.symbol);
+  // Lower-case the leading char so it reads naturally after the clause below.
+  const riskContextClause = riskContext.charAt(0).toLowerCase() + riskContext.slice(1);
+
+  return [
+    utilitySentence,
+    "",
+    `From an OASIS risk perspective, ${riskContextClause}`,
+    ...(table ? ["", "## Relevant OASIS Metrics", table] : []),
+    "",
+    `These factors contribute to ${p.symbol}'s current ORI of **${ctx.ori.current}** (${ctx.ori.grade}).`,
+    profileSourceNote(ctx),
+    DISCLAIMER,
+  ].join("\n");
+}
+
+export function buildProfileOriRelationship(ctx: AnalystTokenContext): string {
+  const p = ctx.profile;
+  if (!p) return profileUnavailable(ctx);
+
+  const primaryType = p.assetTypes[0]?.toLowerCase() ?? "digital";
+  const primaryUtility = p.utilities[0]?.toLowerCase();
+  const ecosystem = p.network ? ` within the ${p.network} ecosystem` : "";
+  const table = relevantMetricsTable(ctx);
+
+  return [
+    `## How ${p.symbol}'s Profile Relates to Its ORI`,
+    profileSourceNote(ctx),
+    "",
+    `**${p.symbol}** primarily functions as a ${primaryType} asset${ecosystem}.`,
+    primaryUtility
+      ? `Because ${primaryUtility} is a core utility, the associated risk dimensions are especially relevant when OASIS assesses ${p.symbol}.`
+      : `Its risk profile is shaped by the dimensions most relevant to this asset type.`,
+    "",
+    buildOasisRiskContext(p.assetTypes, p.symbol),
+    ...(table ? ["", "## Current OASIS Metrics", table] : []),
+    "",
+    `These factors contribute to ${p.symbol}'s current ORI of **${ctx.ori.current}** (${ctx.ori.grade}).`,
+    DISCLAIMER,
+  ].join("\n");
+}
+
+export function buildLaunchInfo(ctx: AnalystTokenContext): string {
+  const p = ctx.profile;
+  if (!p) return profileUnavailable(ctx);
+  const launch = formatLaunch(p.launchDate);
+  return [
+    `**${p.name} (${p.symbol})** — Launch Date: **${launch}**.`,
+    launch === "Not available"
+      ? "A verified launch date is not available from the connected data sources."
+      : "This reflects the project's launch date, not when it was added to any data provider.",
+    profileSourceNote(ctx),
+  ].join("\n");
+}
+
+export function buildNetworkInfo(ctx: AnalystTokenContext): string {
+  const p = ctx.profile;
+  if (!p) return profileUnavailable(ctx);
+  const typeNote = p.assetTypes.length
+    ? ` It is classified as ${p.assetTypes.join(" · ")}.`
+    : "";
+  return [
+    p.network
+      ? `**${p.symbol}** operates on **${p.network}**.${typeNote}`
+      : `The network/ecosystem for **${p.symbol}** is not available from the connected data sources.${typeNote}`,
+    profileSourceNote(ctx),
+  ].join("\n");
+}
+
+export function buildCategoryInfo(ctx: AnalystTokenContext): string {
+  const p = ctx.profile;
+  if (!p) return profileUnavailable(ctx);
+  const types = p.assetTypes.length ? p.assetTypes.join(" · ") : "not clearly classified by the available metadata";
+  return [
+    `**${p.name} (${p.symbol})** is classified as ${types}.`,
+    p.tags.length ? `\nAssociated tags: ${p.tags.slice(0, 10).join(", ")}.` : "",
+    profileSourceNote(ctx),
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+export function buildOfficialResources(ctx: AnalystTokenContext): string {
+  const p = ctx.profile;
+  if (!p) return profileUnavailable(ctx);
+
+  const links: string[] = [];
+  if (p.officialWebsite) links.push(`- Website: [${p.officialWebsite}](${p.officialWebsite})`);
+  if (p.documentationUrl) links.push(`- Docs: [${p.documentationUrl}](${p.documentationUrl})`);
+  if (p.whitepaperUrl) links.push(`- Whitepaper: [${p.whitepaperUrl}](${p.whitepaperUrl})`);
+  if (p.sourceCodeUrl) links.push(`- GitHub: [${p.sourceCodeUrl}](${p.sourceCodeUrl})`);
+  if (p.explorers[0]) links.push(`- Explorer: [${p.explorers[0]}](${p.explorers[0]})`);
+
+  if (!links.length) {
+    return `No official resources for **${p.symbol}** are currently available from the connected data sources.\n${profileSourceNote(ctx)}`;
+  }
+
+  return [`## Official Resources — ${p.symbol}`, ...links, profileSourceNote(ctx)].join("\n");
+}
+
 // ── SCREEN ──────────────────────────────────────────────────────────────────
 
 export function buildScreen(
@@ -432,6 +618,28 @@ export function buildResponse(
       break;
     case "RISK_MEMO":
       content = contexts.map(buildRiskMemo).join("\n\n---\n\n");
+      break;
+    case "PROFILE_OVERVIEW":
+      content = contexts.map(buildProfileOverview).join("\n\n---\n\n");
+      break;
+    case "UTILITY_EXPLAIN":
+      content = contexts.map(buildUtilityExplain).join("\n\n---\n\n");
+      break;
+    case "PROFILE_ORI_RELATIONSHIP":
+      content = contexts.map(buildProfileOriRelationship).join("\n\n---\n\n");
+      severity = contexts[0] ? severityFromScore(contexts[0].components[0]?.score ?? 50) : null;
+      break;
+    case "LAUNCH_INFO":
+      content = contexts.map(buildLaunchInfo).join("\n\n---\n\n");
+      break;
+    case "NETWORK_INFO":
+      content = contexts.map(buildNetworkInfo).join("\n\n---\n\n");
+      break;
+    case "CATEGORY_INFO":
+      content = contexts.map(buildCategoryInfo).join("\n\n---\n\n");
+      break;
+    case "OFFICIAL_RESOURCES":
+      content = contexts.map(buildOfficialResources).join("\n\n---\n\n");
       break;
     case "SCREEN_TOKENS":
       content = buildScreen(

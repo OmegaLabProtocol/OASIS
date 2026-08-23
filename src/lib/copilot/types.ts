@@ -23,7 +23,14 @@ export type CopilotIntent =
   | "COMPARE_TOKENS"
   | "RISK_MEMO"
   | "SCREEN_TOKENS"
-  | "GENERAL_TOKEN_SUMMARY";
+  | "GENERAL_TOKEN_SUMMARY"
+  | "PROFILE_OVERVIEW"
+  | "UTILITY_EXPLAIN"
+  | "LAUNCH_INFO"
+  | "NETWORK_INFO"
+  | "CATEGORY_INFO"
+  | "OFFICIAL_RESOURCES"
+  | "PROFILE_ORI_RELATIONSHIP";
 
 /** Token the user is currently viewing, forwarded so the Copilot is context-aware. */
 export interface CopilotContextToken {

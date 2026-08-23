@@ -4,11 +4,12 @@ import { cn } from "@/lib/utils";
 
 const PROMPTS = [
   "Explain this ORI score",
+  "What is this token used for?",
+  "Which risks matter most?",
   "Why did ORI change?",
-  "Generate risk memo",
-  "Compare with another token",
-  "Explain liquidity risk",
   "Analyze price vs ORI",
+  "Compare with another token",
+  "Generate risk memo",
   "Find stronger institutional alternatives",
 ] as const;
 

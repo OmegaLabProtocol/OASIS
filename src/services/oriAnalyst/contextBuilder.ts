@@ -3,11 +3,17 @@
  */
 import "server-only";
 import { buildTokenContext, type TokenContextResult } from "@/services/copilotContextBuilder";
+import { getAssetProfile } from "@/services/assetProfile";
+import { getRegistryBySymbol } from "@/lib/data/tokenRegistry";
+import type { AssetProfile } from "@/lib/assetProfile/types";
 import type { ResolvedToken } from "./tokenResolver";
 import type { AnalystComponentRow, AnalystTokenContext } from "./types";
 import { scoreTier } from "./metricExplanations";
 
-function toAnalystContext(result: TokenContextResult): AnalystTokenContext {
+function toAnalystContext(
+  result: TokenContextResult,
+  profile: AssetProfile | null
+): AnalystTokenContext {
   const ctx = result.context;
   const ori = ctx.ori as Record<string, unknown>;
   const sd = ctx.scoreDrivers as Record<string, unknown> | null;
@@ -49,16 +55,38 @@ function toAnalystContext(result: TokenContextResult): AnalystTokenContext {
     walletConcentration: (ctx.walletConcentration as Record<string, number | null>) ?? {},
     governance: (ctx.governance as Record<string, number | null> | null) ?? null,
     treasuryAndProtocol: (ctx.treasuryAndProtocol as Record<string, number | null> | null) ?? null,
+    profile,
     dataProvenance: ctx.dataProvenance as AnalystTokenContext["dataProvenance"],
     meta: result.meta,
   };
+}
+
+/** Resolve the OASIS AssetProfile for the analyst context (never throws). */
+async function resolveProfile(token: ResolvedToken): Promise<AssetProfile | null> {
+  try {
+    const registry = getRegistryBySymbol(token.symbol);
+    return await getAssetProfile({
+      symbol: token.symbol,
+      name: token.name,
+      chain: token.chain ?? registry?.chain,
+      registryStatus: token.registryStatus === "curated" ? "curated" : "dynamic",
+      coingeckoId: registry ? undefined : token.detailKey,
+      contractAddress: registry?.address ?? undefined,
+      registryCategory: registry?.protocolCategory,
+    });
+  } catch {
+    return null;
+  }
 }
 
 /** Enrich raw context with legacy metrics + 7d change from token detail. */
 export async function buildAnalystContext(
   token: ResolvedToken
 ): Promise<AnalystTokenContext | null> {
-  const base = await buildTokenContext(token);
+  const [base, profile] = await Promise.all([
+    buildTokenContext(token),
+    resolveProfile(token),
+  ]);
   if (!base) return null;
 
   // Pull supplementary metrics from detail (change7d, legacy components).
@@ -78,7 +106,7 @@ export async function buildAnalystContext(
     };
   }
 
-  return toAnalystContext(base);
+  return toAnalystContext(base, profile);
 }
 
 export function findComponent(

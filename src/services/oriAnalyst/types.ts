@@ -1,4 +1,5 @@
 import type { CopilotContextToken, CopilotTokenCandidate } from "@/lib/copilot/types";
+import type { AssetProfile } from "@/lib/assetProfile/types";
 
 /** Deterministic analyst intents — no LLM required. */
 export type OriAnalystIntent =
@@ -9,7 +10,15 @@ export type OriAnalystIntent =
   | "COMPARE_TOKENS"
   | "RISK_MEMO"
   | "SCREEN_TOKENS"
-  | "GENERAL_TOKEN_SUMMARY";
+  | "GENERAL_TOKEN_SUMMARY"
+  // Asset Profile intents — combine identity metadata with existing ORI context.
+  | "PROFILE_OVERVIEW"
+  | "UTILITY_EXPLAIN"
+  | "LAUNCH_INFO"
+  | "NETWORK_INFO"
+  | "CATEGORY_INFO"
+  | "OFFICIAL_RESOURCES"
+  | "PROFILE_ORI_RELATIONSHIP";
 
 export interface AnalystComponentRow {
   category: string;
@@ -50,6 +59,12 @@ export interface AnalystTokenContext {
   walletConcentration: Record<string, number | null>;
   governance: Record<string, number | null> | null;
   treasuryAndProtocol: Record<string, number | null> | null;
+  /**
+   * Asset identity/profile context (CoinMarketCap-backed, OASIS-normalized).
+   * Present so ORION understands WHAT the asset is, alongside HOW OASIS assesses
+   * its risk. Null when profile metadata could not be resolved at all.
+   */
+  profile: AssetProfile | null;
   dataProvenance: {
     dataMode: "live" | "partial" | "fallback";
     confidence: string | null;
