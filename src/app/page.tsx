@@ -15,6 +15,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { BetaProvider } from "@/components/beta/BetaProvider";
+import { BetaGateWatcher } from "@/components/beta/BetaGateWatcher";
+import { BetaCtaButton } from "@/components/beta/BetaCtaButton";
 import {
   APP_NAME,
   APP_FULL_NAME,
@@ -38,6 +41,8 @@ const features = [
 
 export default function LandingPage() {
   return (
+    <BetaProvider>
+      <BetaGateWatcher />
     <div className="min-h-screen bg-background gradient-mesh">
       <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
@@ -55,9 +60,9 @@ export default function LandingPage() {
               Methodology
             </Link>
             <ThemeToggle />
-            <Button asChild size="sm">
-              <Link href="/dashboard">Launch Dashboard</Link>
-            </Button>
+            <BetaCtaButton size="sm" target="/dashboard">
+              Launch Dashboard
+            </BetaCtaButton>
           </div>
         </div>
       </header>
@@ -74,11 +79,9 @@ export default function LandingPage() {
           into institutional-grade intelligence powered by the Omega Risk Index.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <Button asChild size="lg" className="gap-2">
-            <Link href="/dashboard">
-              Launch Dashboard <ArrowRight className="h-4 w-4" />
-            </Link>
-          </Button>
+          <BetaCtaButton size="lg" className="gap-2" target="/dashboard">
+            Launch Dashboard <ArrowRight className="h-4 w-4" />
+          </BetaCtaButton>
           <Button asChild variant="outline" size="lg">
             <Link href="/methodology">View Methodology</Link>
           </Button>
@@ -173,9 +176,9 @@ export default function LandingPage() {
           OASIS is built for recurring SaaS revenue, API licensing, and institutional workflow
           dependency — the operating system for digital asset risk teams.
         </p>
-        <Button asChild size="lg">
-          <Link href="/dashboard">Request Demo Access</Link>
-        </Button>
+        <BetaCtaButton size="lg" mode="request" target="/dashboard">
+          Request Beta Access
+        </BetaCtaButton>
       </section>
 
       <footer className="border-t border-border py-8 px-6">
@@ -189,5 +192,6 @@ export default function LandingPage() {
         </div>
       </footer>
     </div>
+    </BetaProvider>
   );
 }

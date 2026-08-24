@@ -7,7 +7,12 @@ import {
 } from "@/lib/constants";
 import { ORI_WEIGHTS, COMPONENT_LABELS } from "@/lib/scoring";
 
-export default function MethodologyPage() {
+/**
+ * Full ORI methodology detail (weights, composite formula, component
+ * descriptions). This is proprietary depth and is only rendered for authorized
+ * Private Beta participants and admins.
+ */
+export function MethodologyDetail() {
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
