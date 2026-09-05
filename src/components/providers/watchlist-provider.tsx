@@ -15,29 +15,85 @@ const WatchlistContext = createContext<WatchlistContextType | undefined>(
   undefined
 );
 
-const DEFAULT_WATCHLIST = [...WATCHLIST_SYMBOLS];
+const STORAGE_KEY = "oasis-watchlist";
 
-function readStoredWatchlist(): string[] {
-  const stored = localStorage.getItem("oasis-watchlist");
-  if (!stored) return DEFAULT_WATCHLIST;
+/** Stable SSR / empty-storage fallback. Never reallocated. */
+const DEFAULT_WATCHLIST: string[] = [...WATCHLIST_SYMBOLS];
+
+const listeners = new Set<() => void>();
+let cachedSnapshot: string[] = DEFAULT_WATCHLIST;
+let clientHydrated = false;
+
+function listsEqual(a: string[], b: string[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  return a.every((value, index) => value === b[index]);
+}
+
+function notifyWatchlistSubscribers() {
+  for (const listener of listeners) listener();
+}
+
+function parseStoredWatchlist(raw: string | null): string[] | null {
+  if (!raw) return null;
   try {
-    const parsed = JSON.parse(stored) as unknown;
-    return Array.isArray(parsed) ? (parsed as string[]) : DEFAULT_WATCHLIST;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return null;
+    return parsed.map((item) => String(item));
   } catch {
-    return DEFAULT_WATCHLIST;
+    return null;
   }
 }
 
-function subscribeWatchlist(onStoreChange: () => void) {
-  window.addEventListener("storage", onStoreChange);
-  return () => window.removeEventListener("storage", onStoreChange);
+function hydrateClientSnapshot(): void {
+  if (clientHydrated || typeof window === "undefined") return;
+  clientHydrated = true;
+  const parsed = parseStoredWatchlist(localStorage.getItem(STORAGE_KEY));
+  if (!parsed) {
+    if (cachedSnapshot !== DEFAULT_WATCHLIST) cachedSnapshot = DEFAULT_WATCHLIST;
+    return;
+  }
+  if (listsEqual(cachedSnapshot, parsed)) return;
+  cachedSnapshot = parsed;
+}
+
+function getWatchlistSnapshot(): string[] {
+  hydrateClientSnapshot();
+  return cachedSnapshot;
+}
+
+function getServerWatchlistSnapshot(): string[] {
+  return DEFAULT_WATCHLIST;
+}
+
+function subscribeWatchlist(onStoreChange: () => void): () => void {
+  listeners.add(onStoreChange);
+  const onStorage = (event: StorageEvent) => {
+    if (event.key != null && event.key !== STORAGE_KEY) return;
+    clientHydrated = false;
+    const previous = cachedSnapshot;
+    hydrateClientSnapshot();
+    if (cachedSnapshot !== previous) notifyWatchlistSubscribers();
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    listeners.delete(onStoreChange);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+/** Keep the cached snapshot aligned with in-tab writes without reallocating on no-ops. */
+function rememberWatchlistSnapshot(next: string[]): void {
+  if (listsEqual(cachedSnapshot, next)) return;
+  cachedSnapshot = next;
+  notifyWatchlistSubscribers();
 }
 
 export function WatchlistProvider({ children }: { children: React.ReactNode }) {
   const stored = useSyncExternalStore(
     subscribeWatchlist,
-    readStoredWatchlist,
-    () => DEFAULT_WATCHLIST
+    getWatchlistSnapshot,
+    getServerWatchlistSnapshot
   );
   const [watchlist, setWatchlist] = useState<string[] | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -68,9 +124,13 @@ export function WatchlistProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (loaded) {
-      localStorage.setItem("oasis-watchlist", JSON.stringify(current));
+    if (!loaded) return;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+    } catch {
+      // Persistence is best-effort.
     }
+    rememberWatchlistSnapshot(current);
   }, [current, loaded]);
 
   const addToWatchlist = (symbol: string) => {
