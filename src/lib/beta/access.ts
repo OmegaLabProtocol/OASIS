@@ -3,8 +3,8 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/admin/requireAdmin";
 import { getCurrentAuthUser } from "@/lib/identity/authUser";
-import { hasLinkedBetaIdentity } from "@/lib/identity/link";
-import { getBetaSession, isBetaSessionValid } from "./authorization";
+import { ensureBetaIdentityLinked, hasLinkedBetaIdentity } from "@/lib/identity/link";
+import { isBetaSessionValid } from "./authorization";
 
 export type AccessKind = "admin" | "beta" | "none";
 
@@ -17,8 +17,15 @@ export async function resolveAppAccess(): Promise<AccessKind> {
   if (await isAdmin()) return "admin";
   if (await isBetaSessionValid()) return "beta";
   const authUser = await getCurrentAuthUser();
-  if (authUser && !authUser.isDevBypass && (await hasLinkedBetaIdentity(authUser.id))) {
-    return "beta";
+  if (authUser && !authUser.isDevBypass) {
+    if (await hasLinkedBetaIdentity(authUser.id)) return "beta";
+    // First request after passwordless confirm may not have written the
+    // link yet. Completing it here must not reject a valid invite email.
+    const { linked } = await ensureBetaIdentityLinked({
+      user: authUser,
+      inviteId: authUser.inviteIdFromMetadata,
+    });
+    if (linked) return "beta";
   }
   return "none";
 }
@@ -37,6 +44,5 @@ export async function requireAppAccess(): Promise<AccessKind> {
 
 /** Lightweight boolean for conditionally rendering gated content previews. */
 export async function hasAppAccess(): Promise<boolean> {
-  if (await isAdmin()) return true;
-  return (await getBetaSession()) !== null;
+  return (await resolveAppAccess()) !== "none";
 }

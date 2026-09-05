@@ -49,6 +49,8 @@ export async function proxy(request: NextRequest) {
   }
 
   // --- Protected analytical application ---
+  // Never 404 these routes. Missing access is a redirect to the landing
+  // beta gate, matching /dashboard and the other product surfaces.
   if (isProtectedAppPath(pathname)) {
     const betaToken = request.cookies.get(BETA_SESSION_COOKIE)?.value;
     const payload = await verifyBetaToken(betaToken);

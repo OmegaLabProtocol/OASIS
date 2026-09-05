@@ -21,8 +21,13 @@ const STORAGE_KEY = "oasis-watchlist";
 const DEFAULT_WATCHLIST: string[] = [...WATCHLIST_SYMBOLS];
 
 const listeners = new Set<() => void>();
+
+/**
+ * Cached snapshot. getSnapshot() must return this same reference until an
+ * actual watchlist mutation replaces it. Never parse or allocate inside
+ * getSnapshot — React 19 loops if consecutive reads are not Object.is-equal.
+ */
 let cachedSnapshot: string[] = DEFAULT_WATCHLIST;
-let clientHydrated = false;
 
 function listsEqual(a: string[], b: string[]): boolean {
   if (a === b) return true;
@@ -45,20 +50,30 @@ function parseStoredWatchlist(raw: string | null): string[] | null {
   }
 }
 
-function hydrateClientSnapshot(): void {
-  if (clientHydrated || typeof window === "undefined") return;
-  clientHydrated = true;
+/** Update the cached reference only when contents change. */
+function commitSnapshot(next: string[]): string[] {
+  if (listsEqual(cachedSnapshot, next)) return cachedSnapshot;
+  cachedSnapshot = next;
+  notifyWatchlistSubscribers();
+  return cachedSnapshot;
+}
+
+/** Client-only hydrate. Must not run inside getSnapshot. */
+function hydrateFromLocalStorage(): void {
+  if (typeof window === "undefined") return;
   const parsed = parseStoredWatchlist(localStorage.getItem(STORAGE_KEY));
   if (!parsed) {
-    if (cachedSnapshot !== DEFAULT_WATCHLIST) cachedSnapshot = DEFAULT_WATCHLIST;
+    commitSnapshot(DEFAULT_WATCHLIST);
     return;
   }
-  if (listsEqual(cachedSnapshot, parsed)) return;
-  cachedSnapshot = parsed;
+  commitSnapshot(parsed);
+}
+
+if (typeof window !== "undefined") {
+  hydrateFromLocalStorage();
 }
 
 function getWatchlistSnapshot(): string[] {
-  hydrateClientSnapshot();
   return cachedSnapshot;
 }
 
@@ -70,23 +85,13 @@ function subscribeWatchlist(onStoreChange: () => void): () => void {
   listeners.add(onStoreChange);
   const onStorage = (event: StorageEvent) => {
     if (event.key != null && event.key !== STORAGE_KEY) return;
-    clientHydrated = false;
-    const previous = cachedSnapshot;
-    hydrateClientSnapshot();
-    if (cachedSnapshot !== previous) notifyWatchlistSubscribers();
+    hydrateFromLocalStorage();
   };
   window.addEventListener("storage", onStorage);
   return () => {
     listeners.delete(onStoreChange);
     window.removeEventListener("storage", onStorage);
   };
-}
-
-/** Keep the cached snapshot aligned with in-tab writes without reallocating on no-ops. */
-function rememberWatchlistSnapshot(next: string[]): void {
-  if (listsEqual(cachedSnapshot, next)) return;
-  cachedSnapshot = next;
-  notifyWatchlistSubscribers();
 }
 
 export function WatchlistProvider({ children }: { children: React.ReactNode }) {
@@ -130,7 +135,7 @@ export function WatchlistProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Persistence is best-effort.
     }
-    rememberWatchlistSnapshot(current);
+    commitSnapshot(current);
   }, [current, loaded]);
 
   const addToWatchlist = (symbol: string) => {
