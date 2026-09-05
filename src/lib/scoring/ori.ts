@@ -30,23 +30,14 @@ import {
 import { scoreSupplyRisk } from "./supplyRiskScore";
 import { clampScore, weightedAverage } from "./utils";
 
-export const ORI_CATEGORY_WEIGHTS = {
-  marketLiquidity: 0.2,
-  protocolFundamentals: 0.2,
-  holderDistribution: 0.15,
-  governance: 0.15,
-  developerActivity: 0.15,
-  supplyRisk: 0.15,
-} as const;
+import { ORI_CATEGORY_WEIGHTS } from "@/lib/ori/methodology";
 
-export const ORI_CATEGORY_LABELS: Record<keyof OriCategoryScores, string> = {
-  marketLiquidity: "Market Liquidity",
-  protocolFundamentals: "Protocol Fundamentals",
-  holderDistribution: "Holder Distribution",
-  governance: "Governance",
-  developerActivity: "Developer Activity",
-  supplyRisk: "Supply / Dilution Risk",
-};
+export {
+  ORI_CATEGORY_WEIGHTS,
+  ORI_CATEGORY_LABELS,
+  ORI_CATEGORY_KEYS,
+  ORI_METHODOLOGY_VERSION,
+} from "@/lib/ori/methodology";
 
 export interface OriComputeContext {
   mockUsage?: MockFallbackUsage[];

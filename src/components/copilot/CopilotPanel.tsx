@@ -46,6 +46,14 @@ export function CopilotPanel() {
     setDisambiguation(null);
     setLoading(true);
     lastQuestionRef.current = question;
+    const { trackProductEvent } = await import(
+      "@/components/analytics/ProductAnalyticsProvider"
+    );
+    trackProductEvent("orion_question_submitted", {
+      page: typeof window !== "undefined" ? window.location.pathname : undefined,
+      assetId: contextToken?.symbol ?? null,
+      metadata: { hasContextToken: Boolean(contextToken) },
+    });
 
     const history: WireMessage[] = messages
       .filter((m) => !m.pending)

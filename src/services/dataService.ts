@@ -31,6 +31,11 @@ import {
 } from "@/lib/scoring";
 import { deriveORIResult } from "@/lib/ori/service";
 import { buildFallbackResult } from "@/lib/ori/fallback";
+import { ORI_METHODOLOGY_VERSION } from "@/lib/ori/methodology";
+import {
+  EMPTY_UNDERLYING_METRICS,
+  fallbackDataConfidence,
+} from "@/lib/ori/enrich";
 import { resolveToken } from "@/lib/ori/tokenMap";
 import {
   historyToPoints,
@@ -214,18 +219,31 @@ function deriveFromRaw(symbol: string, raw: TokenRawMetrics): ORIResult {
   const previous = previousScoreFromHistory(history);
   const { absoluteChange, percentChange } = getORIChange(current, previous);
   const grade = getGrade(current);
+  const tokenId = symbol.toUpperCase();
   return {
-    tokenId: symbol.toUpperCase(),
+    tokenId,
+    assetId: tokenId,
     symbol: raw.symbol,
     name: raw.name,
     currentScore: current,
+    overallScore: current,
     previousScore: previous,
     absoluteChange,
     percentChange,
+    change24h: absoluteChange,
+    change7d: null,
+    change30d: null,
     grade,
     riskTier: getRiskTier(current),
     note: getORINote(current, percentChange, grade),
     color: getColor(current),
+    methodologyVersion: ORI_METHODOLOGY_VERSION,
+    calculationType: "live",
+    categoryScores: [],
+    scoreDrivers: [],
+    dataConfidence: fallbackDataConfidence(),
+    dataSources: [],
+    underlyingMetrics: EMPTY_UNDERLYING_METRICS,
     history,
     lastUpdated: new Date().toISOString(),
     dataSource: "fallback",

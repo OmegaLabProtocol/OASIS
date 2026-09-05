@@ -8,6 +8,8 @@ import { CopilotProvider } from "@/components/copilot/CopilotProvider";
 import { CopilotPanel } from "@/components/copilot/CopilotPanel";
 import { BetaBadge } from "@/components/beta/BetaBadge";
 import { ExitBetaButton } from "@/components/beta/ExitBetaButton";
+import { BetaIdentityBanner } from "@/components/beta/BetaIdentityBanner";
+import { ProductAnalyticsProvider } from "@/components/analytics/ProductAnalyticsProvider";
 
 export function AppShell({
   children,
@@ -21,6 +23,7 @@ export function AppShell({
 }) {
   return (
     <CopilotProvider>
+      <ProductAnalyticsProvider>
       <div className="min-h-screen bg-background">
         <SidebarNavigation />
         <div className="lg:pl-56 flex flex-col min-h-screen">
@@ -45,6 +48,7 @@ export function AppShell({
               <ExitBetaButton />
             </div>
           )}
+          {betaMode && <BetaIdentityBanner />}
           <main className="relative flex-1 p-6 gradient-mesh">
             <OmegaWatermark />
             <div className="relative z-10">{children}</div>
@@ -53,6 +57,7 @@ export function AppShell({
         </div>
         <CopilotPanel />
       </div>
+      </ProductAnalyticsProvider>
     </CopilotProvider>
   );
 }

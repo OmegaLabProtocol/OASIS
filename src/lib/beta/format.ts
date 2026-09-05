@@ -53,6 +53,7 @@ const EVENT_LABELS: Record<BetaEventType, string> = {
   team_member_role_changed: "Team role changed",
   team_member_deactivated: "Team member deactivated",
   team_member_reactivated: "Team member reactivated",
+  identity_linked: "Identity confirmed",
 };
 
 export function humanizeEvent(type: BetaEventType | string): string {

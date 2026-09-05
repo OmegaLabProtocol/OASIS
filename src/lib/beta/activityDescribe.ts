@@ -164,6 +164,9 @@ export function describeEvent(
     case "team_member_reactivated":
       description = `Reactivated ${teamTarget(m)}`;
       break;
+    case "identity_linked":
+      description = "Confirmed their OASIS identity";
+      break;
     default:
       description = String(event.event_type).replace(/_/g, " ");
   }

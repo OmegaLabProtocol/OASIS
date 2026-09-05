@@ -16,6 +16,8 @@ import {
 } from "./grade";
 import { buildHistory, previousScoreFromHistory } from "./history";
 import { resolveAssetTier } from "@/lib/data/mockOriTiers";
+import { ORI_METHODOLOGY_VERSION } from "./methodology";
+import { EMPTY_UNDERLYING_METRICS, fallbackDataConfidence } from "./enrich";
 import type { ORIResult, TokenIdentity } from "./types";
 
 /** Deterministic baseline ORI per token when nothing live is available. */
@@ -67,14 +69,26 @@ export function buildFallbackFromIdentity(
 
   return {
     ...identity,
+    assetId: identity.tokenId,
     currentScore: current,
+    overallScore: current,
     previousScore: previous,
     absoluteChange,
     percentChange,
+    change24h: absoluteChange,
+    change7d: null,
+    change30d: null,
     grade,
     riskTier: getRiskTier(current),
     note: getORINote(current, percentChange, grade),
     color: getColor(current),
+    methodologyVersion: ORI_METHODOLOGY_VERSION,
+    calculationType: "live",
+    categoryScores: [],
+    scoreDrivers: [],
+    dataConfidence: fallbackDataConfidence(),
+    dataSources: [],
+    underlyingMetrics: EMPTY_UNDERLYING_METRICS,
     history,
     lastUpdated: new Date().toISOString(),
     dataSource: "fallback",

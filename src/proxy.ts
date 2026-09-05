@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { BETA_SESSION_COOKIE } from "@/lib/beta/constants";
 import { verifyBetaToken } from "@/lib/beta/session";
 import { updateAdminSession } from "@/lib/supabase/middleware";
+import { devAuthBypassEnabled } from "@/lib/env";
 
 /**
  * Access-control proxy (Next.js 16 renamed the `middleware` convention to
@@ -10,6 +11,9 @@ import { updateAdminSession } from "@/lib/supabase/middleware";
  */
 const PROTECTED_APP_PREFIXES = [
   "/dashboard",
+  "/screener",
+  "/portfolios",
+  "/watchlist",
   "/liquidity",
   "/wallets",
   "/protocols",
@@ -26,6 +30,10 @@ function isProtectedAppPath(pathname: string): boolean {
 
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
+
+  // Development-only bypass: skip all gating so the UI is freely navigable
+  // locally. Hard-gated to non-production (see devAuthBypassEnabled).
+  if (devAuthBypassEnabled()) return NextResponse.next();
 
   // --- Admin area ---
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {

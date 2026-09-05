@@ -41,7 +41,8 @@ export type BetaEventType =
   | "team_member_added"
   | "team_member_role_changed"
   | "team_member_deactivated"
-  | "team_member_reactivated";
+  | "team_member_reactivated"
+  | "identity_linked";
 
 export interface AdminProfile {
   id: string;

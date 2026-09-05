@@ -29,11 +29,10 @@ export const RISK_CHANGE_DRIVERS = [
 ] as const;
 
 export const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard", icon: "LayoutDashboard" },
-  { href: "/liquidity", label: "Liquidity", icon: "Droplets" },
-  { href: "/wallets", label: "Wallets", icon: "Wallet" },
-  { href: "/protocols", label: "Protocols", icon: "Layers" },
+  { href: "/dashboard", label: "Overview", icon: "LayoutDashboard" },
+  { href: "/screener", label: "Screener", icon: "Filter" },
+  { href: "/portfolios", label: "Portfolios", icon: "Briefcase" },
+  { href: "/watchlist", label: "Watchlist", icon: "Star" },
   { href: "/alerts", label: "Alerts", icon: "Bell" },
   { href: "/methodology", label: "Methodology", icon: "BookOpen" },
-  { href: "/api-portal", label: "API Portal", icon: "Code2" },
 ] as const;

@@ -7,6 +7,8 @@ import {
 import { getInviteById } from "@/lib/beta/validateInvite";
 import { recordEvent } from "@/lib/beta/events";
 import { betaUserActor } from "@/lib/beta/actor";
+import { getCurrentAdmin } from "@/lib/admin/requireAdmin";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,5 +26,18 @@ export async function POST() {
   }
   await clearBetaSession();
   await clearPendingSession();
+
+  // Sign out a beta Auth session so Exit actually leaves the product.
+  // Never sign out an administrator.
+  const admin = await getCurrentAdmin();
+  if (!admin) {
+    try {
+      const supabase = await createSupabaseServerClient();
+      await supabase.auth.signOut();
+    } catch {
+      // Cookie/session cleanup is best-effort.
+    }
+  }
+
   return NextResponse.json({ ok: true, redirect: "/" });
 }

@@ -11,6 +11,8 @@ import { registerSessionUse } from "@/lib/beta/invites";
 import { recordEvent } from "@/lib/beta/events";
 import { betaUserActor } from "@/lib/beta/actor";
 import { safeInternalPath } from "@/lib/beta/redirect";
+import { sendBetaActivationLink } from "@/lib/identity/activation";
+import { maskEmail } from "@/lib/identity/redirect";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -80,6 +82,16 @@ export async function POST(request: Request) {
     actor,
   });
 
+  // Passwordless Auth is offered after Terms — it must never block access.
+  void sendBetaActivationLink(invite);
+
   const next = safeInternalPath(typeof body.next === "string" ? body.next : null);
-  return NextResponse.json({ ok: true, redirect: next });
+  return NextResponse.json({
+    ok: true,
+    redirect: next,
+    identity: {
+      state: "invite_only",
+      maskedEmail: maskEmail(invite.recipient_email),
+    },
+  });
 }

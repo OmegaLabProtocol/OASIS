@@ -30,7 +30,8 @@ export type CopilotIntent =
   | "NETWORK_INFO"
   | "CATEGORY_INFO"
   | "OFFICIAL_RESOURCES"
-  | "PROFILE_ORI_RELATIONSHIP";
+  | "PROFILE_ORI_RELATIONSHIP"
+  | "PORTFOLIO_RISK";
 
 /** Token the user is currently viewing, forwarded so the Copilot is context-aware. */
 export interface CopilotContextToken {

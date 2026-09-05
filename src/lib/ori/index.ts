@@ -7,8 +7,22 @@ export type {
   ORIHistoryPoint,
   ORIDataSource,
   ORIRefreshStatus,
+  ORICalculationType,
+  ORICategoryScore,
+  ORIScoreDriver,
+  ORIDataConfidence,
+  ORIDataSourceRecord,
+  ORIUnderlyingMetrics,
   TokenIdentity,
 } from "./types";
+export {
+  ORI_METHODOLOGY_VERSION,
+  ORI_CATEGORY_WEIGHTS,
+  ORI_CATEGORY_LABELS,
+  ORI_CATEGORY_KEYS,
+  toConfidenceLevel,
+} from "./methodology";
+export type { OriCategoryKey, ORIConfidenceLevel } from "./methodology";
 export {
   TOKEN_IDENTITIES,
   getAllTokenIds,

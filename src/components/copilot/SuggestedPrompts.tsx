@@ -11,6 +11,7 @@ const PROMPTS = [
   "Compare with another token",
   "Generate risk memo",
   "Find stronger institutional alternatives",
+  "What is driving risk in my portfolio?",
 ] as const;
 
 interface SuggestedPromptsProps {

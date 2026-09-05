@@ -17,6 +17,15 @@ export function detectAnalystIntent(
 ): IntentResult {
   const m = message.toLowerCase().trim();
 
+  if (
+    /\bportfolio\b/.test(m) ||
+    /\bwhat-if\b/.test(m) ||
+    /\bif .+ (removed|removed from)\b/.test(m) ||
+    /\bholding contributes\b/.test(m)
+  ) {
+    return { intent: "PORTFOLIO_RISK" };
+  }
+
   // COMPARE
   if (
     /\b(vs\.?|versus)\b/.test(m) ||

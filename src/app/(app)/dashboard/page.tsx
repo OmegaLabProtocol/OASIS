@@ -34,11 +34,71 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-light tracking-tight">Risk Dashboard</h1>
+        <h1 className="text-2xl font-light tracking-tight">Overview</h1>
         <p className="text-sm text-muted-foreground mt-1">
           What changed in the market that requires your attention today?
         </p>
       </div>
+
+      <div className="flex flex-wrap gap-2 text-xs">
+        <Link href="/screener" className="rounded-md border border-border px-2.5 py-1 hover:bg-muted">
+          Open Screener
+        </Link>
+        <Link href="/portfolios" className="rounded-md border border-border px-2.5 py-1 hover:bg-muted">
+          Portfolio Workspace
+        </Link>
+        <Link href="/watchlist" className="rounded-md border border-border px-2.5 py-1 hover:bg-muted">
+          Watchlist
+        </Link>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground">
+            Requires attention
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-3 text-xs">
+          <div>
+            <p className="text-muted-foreground mb-1">Deteriorating ORI</p>
+            {watchlistResults
+              .filter((r) => (r.change24h ?? 0) < 0)
+              .sort((a, b) => (a.change24h ?? 0) - (b.change24h ?? 0))
+              .slice(0, 3)
+              .map((r) => (
+                <Link key={r.assetId} href={`/tokens/${r.symbol}`} className="block hover:underline">
+                  {r.symbol} {r.change24h}
+                </Link>
+              ))}
+            {watchlistResults.every((r) => (r.change24h ?? 0) >= 0) && (
+              <p className="text-muted-foreground">No deteriorating assets in the tracked set.</p>
+            )}
+          </div>
+          <div>
+            <p className="text-muted-foreground mb-1">Improving ORI</p>
+            {watchlistResults
+              .filter((r) => (r.change24h ?? 0) > 0)
+              .sort((a, b) => (b.change24h ?? 0) - (a.change24h ?? 0))
+              .slice(0, 3)
+              .map((r) => (
+                <Link key={r.assetId} href={`/tokens/${r.symbol}`} className="block hover:underline">
+                  {r.symbol} +{r.change24h}
+                </Link>
+              ))}
+          </div>
+          <div>
+            <p className="text-muted-foreground mb-1">Lowest confidence</p>
+            {[...watchlistResults]
+              .sort((a, b) => a.dataConfidence.score - b.dataConfidence.score)
+              .slice(0, 3)
+              .map((r) => (
+                <Link key={r.assetId} href={`/tokens/${r.symbol}`} className="block hover:underline">
+                  {r.symbol} · {r.dataConfidence.level}
+                </Link>
+              ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <DataConfidenceBadge confidence={market.confidence} />
 

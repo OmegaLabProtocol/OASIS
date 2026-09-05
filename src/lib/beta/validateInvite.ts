@@ -125,3 +125,21 @@ export async function getInviteById(id: string): Promise<BetaInvite | null> {
     .maybeSingle();
   return (data as BetaInvite | null) ?? null;
 }
+
+/** Latest non-revoked invite for this email — used when Auth lands without a cookie. */
+export async function getInviteByRecipientEmail(
+  email: string
+): Promise<BetaInvite | null> {
+  const trimmed = email.trim();
+  if (!trimmed) return null;
+  const supabase = createSupabaseAdminClient();
+  const { data } = await supabase
+    .from("beta_invites")
+    .select("*")
+    .ilike("recipient_email", trimmed)
+    .is("revoked_at", null)
+    .order("created_at", { ascending: false })
+    .limit(8);
+  const rows = (data as BetaInvite[] | null) ?? [];
+  return rows.find((invite) => deriveInviteStatus(invite) === "active") ?? rows[0] ?? null;
+}

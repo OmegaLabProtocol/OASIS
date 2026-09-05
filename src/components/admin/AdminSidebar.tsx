@@ -36,6 +36,7 @@ const ITEMS: NavItem[] = [
   { href: "/admin/users", label: "Beta Users", icon: Users, permission: "view_admin" },
   { href: "/admin/terms", label: "Terms", icon: FileText, permission: "manage_terms" },
   { href: "/admin/activity", label: "Activity", icon: Activity, permission: "view_activity" },
+  { href: "/admin/product", label: "Product Analytics", icon: Activity, permission: "view_activity" },
   { href: "/admin/team", label: "Team", icon: UsersRound, permission: "manage_team" },
   { href: "/admin/settings", label: "Settings", icon: Settings, permission: "view_settings" },
 ];

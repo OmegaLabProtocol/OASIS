@@ -15,6 +15,8 @@ import {
 } from "@/components/ORIIntelligenceReport";
 import { RiskBriefGenerator } from "@/components/RiskBriefGenerator";
 import { AddToWatchlistButton } from "@/components/AddToWatchlistButton";
+import { AssetActions } from "@/components/actions/AssetActions";
+import { OriHistoryPanel } from "@/components/OriHistoryPanel";
 import { DataSourcesTrustPanel } from "@/components/DataSourcesTrustPanel";
 import { OriCategoryBreakdown } from "@/components/OriCategoryBreakdown";
 import { AssetProfileCard } from "@/components/AssetProfileCard";
@@ -92,7 +94,10 @@ export default async function TokenPage({
             Is this asset institutionally safe to hold, trade, custody, or monitor?
           </p>
         </div>
-        <AddToWatchlistButton symbol={metrics.symbol} />
+        <div className="flex items-center gap-2">
+          <AddToWatchlistButton symbol={metrics.symbol} />
+          <AssetActions symbol={metrics.symbol} />
+        </div>
       </div>
 
       <DataConfidenceBadge confidence={confidence} />
@@ -163,11 +168,12 @@ export default async function TokenPage({
       <AIInsightCard summary={commentary.summary} />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <OriHistoryPanel symbol={metrics.symbol} fallback={history.ori} />
         <TokenOriHistoryChart
           symbol={metrics.symbol}
           initial={oriResultNormalized}
           fallbackData={history.ori}
-          title="ORI Score Over Time"
+          title="Session ORI path"
         />
         <HistoricalChart
           data={history.liquidity}

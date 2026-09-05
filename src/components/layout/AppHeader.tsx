@@ -44,13 +44,9 @@ export function AppHeader() {
   useEffect(() => {
     const q = query.trim();
     if (q.length < 2) {
-      setResults([]);
-      setSearched(false);
-      setLoading(false);
       return;
     }
 
-    setLoading(true);
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       try {
@@ -124,7 +120,17 @@ export function AppHeader() {
             placeholder="Search tokens (ETH, SOL, ARB, contract...)"
             className="pl-8 h-8 text-sm"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value;
+              setQuery(next);
+              if (next.trim().length < 2) {
+                setResults([]);
+                setSearched(false);
+                setLoading(false);
+              } else {
+                setLoading(true);
+              }
+            }}
             onFocus={() => results.length > 0 && setOpen(true)}
             onKeyDown={onKeyDown}
             role="combobox"

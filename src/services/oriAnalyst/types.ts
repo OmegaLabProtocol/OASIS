@@ -18,7 +18,8 @@ export type OriAnalystIntent =
   | "NETWORK_INFO"
   | "CATEGORY_INFO"
   | "OFFICIAL_RESOURCES"
-  | "PROFILE_ORI_RELATIONSHIP";
+  | "PROFILE_ORI_RELATIONSHIP"
+  | "PORTFOLIO_RISK";
 
 export interface AnalystComponentRow {
   category: string;

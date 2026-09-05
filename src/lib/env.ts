@@ -38,6 +38,20 @@ export function hasSupabasePublicConfig(): boolean {
   return Boolean(url && publishableKey);
 }
 
+/**
+ * Development-only auth bypass. When enabled, the app treats the visitor as an
+ * authenticated OWNER admin and skips beta gating, so the UI can be navigated
+ * locally without a Supabase session or a beta invite.
+ *
+ * HARD-GATED to non-production: this can NEVER be turned on in a production
+ * build regardless of the env var, so it cannot weaken the deployed app.
+ * Enable locally by setting `OASIS_DEV_AUTH_BYPASS=1` in `.env.local`.
+ */
+export function devAuthBypassEnabled(): boolean {
+  if (process.env.NODE_ENV === "production") return false;
+  return process.env.OASIS_DEV_AUTH_BYPASS?.trim() === "1";
+}
+
 /** Server-only Supabase secret key (service role equivalent). */
 export function supabaseSecretKey(): string {
   return process.env.SUPABASE_SECRET_KEY?.trim() ?? "";
@@ -66,6 +80,15 @@ export function betaSigningSecret(): string {
   if (dedicated) return dedicated;
   const fallback = supabaseSecretKey();
   return fallback || "oasis-insecure-dev-secret-change-me";
+}
+
+/**
+ * Shared secret for scheduled jobs (Vercel Cron → `/api/cron/*`).
+ * Server-only. Vercel injects `Authorization: Bearer <CRON_SECRET>` when
+ * this env var is configured on the project.
+ */
+export function cronSecret(): string {
+  return process.env.CRON_SECRET?.trim() ?? "";
 }
 
 function stripTrailingSlash(value: string): string {

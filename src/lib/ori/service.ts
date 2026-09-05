@@ -23,6 +23,14 @@ import {
 } from "./grade";
 import { buildHistory, previousScoreFromHistory } from "./history";
 import { buildFallbackFromIdentity, buildFallbackResult } from "./fallback";
+import { ORI_METHODOLOGY_VERSION } from "./methodology";
+import {
+  buildCategoryScores,
+  buildDataConfidence,
+  buildDataSources,
+  buildScoreDrivers,
+  buildUnderlyingMetrics,
+} from "./enrich";
 import {
   getAssetOverviewTokens,
   type AssetOverviewToken,
@@ -56,17 +64,31 @@ export function deriveORIResult(
   const previous = previousScoreFromHistory(history);
   const { absoluteChange, percentChange } = getORIChange(current, previous);
   const grade = getGrade(current);
+  const categoryScores = buildCategoryScores(lookup);
 
   return {
     ...identity,
+    assetId: identity.tokenId,
     currentScore: current,
+    overallScore: current,
     previousScore: previous,
     absoluteChange,
     percentChange,
+    change24h: absoluteChange,
+    // Real 7d/30d change requires persisted history (Phase 3); never fabricated.
+    change7d: null,
+    change30d: null,
     grade,
     riskTier: getRiskTier(current),
     note: getORINote(current, percentChange, grade),
     color: getColor(current),
+    methodologyVersion: ORI_METHODOLOGY_VERSION,
+    calculationType: "live",
+    categoryScores,
+    scoreDrivers: buildScoreDrivers(categoryScores),
+    dataConfidence: buildDataConfidence(lookup),
+    dataSources: buildDataSources(lookup),
+    underlyingMetrics: buildUnderlyingMetrics(lookup),
     history,
     lastUpdated: lookup.computedAt ?? new Date().toISOString(),
     dataSource: mapDataSource(lookup.dataMode),
@@ -146,7 +168,7 @@ export async function buildAllORIResults(): Promise<ORIResult[]> {
 async function buildOverviewORIResult(
   token: AssetOverviewToken
 ): Promise<ORIResult> {
-  let result =
+  const result =
     (await buildORIResult(token.oriKey)) ??
     (await buildORIResult(token.symbol));
 
