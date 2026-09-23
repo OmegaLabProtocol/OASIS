@@ -8,6 +8,7 @@ import {
   APP_FULL_NAME,
   TAGLINE,
 } from "@/lib/constants";
+import { appUrl } from "@/lib/env";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -21,6 +22,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(appUrl()),
   title: `${APP_NAME} — ${TAGLINE}`,
   description: `${APP_FULL_NAME}. Institutional digital asset intelligence powered by the Omega Risk Index (ORI).`,
 };

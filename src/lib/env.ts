@@ -9,18 +9,27 @@
  *  - No secret value is ever logged or returned to the client.
  */
 
-const PRODUCTION_APP_URL = "https://omegalabs-oasis.vercel.app";
+/** Canonical public production host. The Vercel alias remains a fallback host. */
+const PRODUCTION_APP_URL = "https://oasisori.com";
 
 /** Public base URL of the application, safe for links/redirects. */
 export function appUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_APP_URL?.trim();
   if (explicit) return stripTrailingSlash(explicit);
 
-  // Vercel provides VERCEL_URL (host only, no protocol) for preview builds.
+  const vercelEnv = process.env.VERCEL_ENV?.trim();
   const vercel = process.env.VERCEL_URL?.trim();
-  if (vercel) return `https://${stripTrailingSlash(vercel)}`;
 
-  if (process.env.NODE_ENV === "production") return PRODUCTION_APP_URL;
+  // Preview deployments keep their unique *.vercel.app host.
+  if (vercelEnv === "preview" && vercel) {
+    return `https://${stripTrailingSlash(vercel)}`;
+  }
+
+  if (process.env.NODE_ENV === "production" || vercelEnv === "production") {
+    return PRODUCTION_APP_URL;
+  }
+
+  if (vercel) return `https://${stripTrailingSlash(vercel)}`;
   return "http://localhost:3000";
 }
 
@@ -100,7 +109,7 @@ export function investorPreviewEnabled(): boolean {
 export function investorContactEmail(): string {
   return (
     process.env.NEXT_PUBLIC_INVESTOR_CONTACT_EMAIL?.trim() ||
-    "omegalabsblockchain@gmail.com"
+    "ian@oasisori.com"
   );
 }
 

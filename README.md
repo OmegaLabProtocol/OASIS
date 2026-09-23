@@ -55,13 +55,13 @@ Required for private beta + persistence:
 
 Optional:
 
-- `NEXT_PUBLIC_APP_URL` — canonical site URL for magic-link redirects (falls back to `VERCEL_URL` / production host)
+- `NEXT_PUBLIC_APP_URL` — canonical site URL for magic-link redirects (production default `https://oasisori.com`; Preview uses `VERCEL_URL`; local uses `http://localhost:3000`)
 - `CRON_SECRET` — Vercel Cron bearer for `GET /api/cron/ori-snapshots`
 - `OASIS_DEV_AUTH_BYPASS=1` — local-only admin/product bypass (hard-disabled in production)
 - `RESEND_API_KEY`, `OASIS_EMAIL_FROM`, `OASIS_EMAIL_REPLY_TO`
 - `OPENAI_API_KEY` — Intelligence Report only (ORION is deterministic)
 - `INVESTOR_PREVIEW_ENABLED=true` — allow Investor Preview session creation at `/investor`
-- `NEXT_PUBLIC_INVESTOR_CONTACT_EMAIL` — founder inbox for Investor Preview Contact Founder (defaults to `omegalabsblockchain@gmail.com`)
+- `NEXT_PUBLIC_INVESTOR_CONTACT_EMAIL` — founder inbox for Investor Preview Contact Founder (defaults to `ian@oasisori.com`)
 
 Supabase Auth (dashboard, not env): enable the Email provider with magic link / OTP. Confirm Site URL and add `{APP_URL}/auth/callback` to Redirect URLs. Admin login keeps `shouldCreateUser: false`. Beta confirmation creates a user for the invited email only, via the service-role `generateLink` path — no password.
 
