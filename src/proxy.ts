@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { BETA_SESSION_COOKIE } from "@/lib/beta/constants";
 import { verifyBetaToken } from "@/lib/beta/session";
+import { INVESTOR_SESSION_COOKIE } from "@/lib/investor/constants";
+import { verifyInvestorToken } from "@/lib/investor/session";
 import { updateAdminSession } from "@/lib/supabase/middleware";
 import { devAuthBypassEnabled } from "@/lib/env";
 
@@ -56,6 +58,16 @@ export async function proxy(request: NextRequest) {
     const payload = await verifyBetaToken(betaToken);
     if (payload && payload.k === "beta") {
       return NextResponse.next();
+    }
+
+    const investorToken = request.cookies.get(INVESTOR_SESSION_COOKIE)?.value;
+    if (investorToken) {
+      const investor = await verifyInvestorToken(investorToken);
+      if (investor) return NextResponse.next();
+      const expired = request.nextUrl.clone();
+      expired.pathname = "/investor";
+      expired.search = "";
+      return NextResponse.redirect(expired);
     }
 
     // Admin bypass: authenticated admins never need a beta code.

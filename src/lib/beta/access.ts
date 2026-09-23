@@ -5,8 +5,9 @@ import { isAdmin } from "@/lib/admin/requireAdmin";
 import { getCurrentAuthUser } from "@/lib/identity/authUser";
 import { ensureBetaIdentityLinked, hasLinkedBetaIdentity } from "@/lib/identity/link";
 import { isBetaSessionValid } from "./authorization";
+import { getInvestorSession, hasInvestorCookie } from "@/lib/investor/authorization";
 
-export type AccessKind = "admin" | "beta" | "none";
+export type AccessKind = "admin" | "beta" | "investor" | "none";
 
 /**
  * Determines how the current request is authorized for the protected app.
@@ -16,6 +17,7 @@ export type AccessKind = "admin" | "beta" | "none";
 export async function resolveAppAccess(): Promise<AccessKind> {
   if (await isAdmin()) return "admin";
   if (await isBetaSessionValid()) return "beta";
+  if (await getInvestorSession()) return "investor";
   const authUser = await getCurrentAuthUser();
   if (authUser && !authUser.isDevBypass) {
     if (await hasLinkedBetaIdentity(authUser.id)) return "beta";
@@ -38,7 +40,10 @@ export async function resolveAppAccess(): Promise<AccessKind> {
  */
 export async function requireAppAccess(): Promise<AccessKind> {
   const access = await resolveAppAccess();
-  if (access === "none") redirect("/?beta=1");
+  if (access === "none") {
+    if (await hasInvestorCookie()) redirect("/investor");
+    redirect("/?beta=1");
+  }
   return access;
 }
 

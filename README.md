@@ -60,6 +60,8 @@ Optional:
 - `OASIS_DEV_AUTH_BYPASS=1` — local-only admin/product bypass (hard-disabled in production)
 - `RESEND_API_KEY`, `OASIS_EMAIL_FROM`, `OASIS_EMAIL_REPLY_TO`
 - `OPENAI_API_KEY` — Intelligence Report only (ORION is deterministic)
+- `INVESTOR_PREVIEW_ENABLED=true` — allow Investor Preview session creation at `/investor`
+- `NEXT_PUBLIC_INVESTOR_CONTACT_EMAIL` — founder inbox for Investor Preview Contact Founder (defaults to `omegalabsblockchain@gmail.com`)
 
 Supabase Auth (dashboard, not env): enable the Email provider with magic link / OTP. Confirm Site URL and add `{APP_URL}/auth/callback` to Redirect URLs. Admin login keeps `shouldCreateUser: false`. Beta confirmation creates a user for the invited email only, via the service-role `generateLink` path — no password.
 
@@ -72,8 +74,9 @@ Additive SQL in `supabase/migrations/`:
 3. `0003_ori_history.sql` — daily ORI snapshots (**already applied — do not re-run or edit**)
 4. `0004_product_analytics.sql` — sessions, events, `beta_identity_links`; `user_id` is canonical, `invite_id` is attribution
 5. `0005_user_workspace.sql` — saved screens, watchlists, portfolios owned by `user_id` (invite-only rows are transitional)
+6. `0006_investor_preview.sql` — additive `session_type`, `anonymous_session_id`, `investor_ref` on product analytics
 
-Paste **0004 then 0005** into the Supabase SQL editor. Do not modify 0003. Features that write to these tables fail closed (empty UI) until applied.
+Paste **0004 then 0005 then 0006** into the Supabase SQL editor. Do not modify 0003–0005. Features that write to these tables fail closed (empty UI) until applied.
 
 ## Scheduled jobs
 

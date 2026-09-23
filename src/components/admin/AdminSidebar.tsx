@@ -12,6 +12,7 @@ import {
   UsersRound,
   Settings,
   ExternalLink,
+  Briefcase,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -37,6 +38,7 @@ const ITEMS: NavItem[] = [
   { href: "/admin/terms", label: "Terms", icon: FileText, permission: "manage_terms" },
   { href: "/admin/activity", label: "Activity", icon: Activity, permission: "view_activity" },
   { href: "/admin/product", label: "Product Analytics", icon: Activity, permission: "view_activity" },
+  { href: "/admin/product/investors", label: "Investor Preview", icon: Briefcase, permission: "view_activity" },
   { href: "/admin/team", label: "Team", icon: UsersRound, permission: "manage_team" },
   { href: "/admin/settings", label: "Settings", icon: Settings, permission: "view_settings" },
 ];

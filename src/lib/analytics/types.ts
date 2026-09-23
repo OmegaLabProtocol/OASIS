@@ -25,6 +25,16 @@ export const PRODUCT_EVENT_NAMES = [
   "orion_question_submitted",
   "csv_exported",
   "report_generated",
+  "investor_session_started",
+  "investor_dashboard_viewed",
+  "investor_token_viewed",
+  "investor_ori_breakdown_viewed",
+  "investor_screener_used",
+  "investor_portfolio_created",
+  "investor_portfolio_analyzed",
+  "investor_orion_opened",
+  "investor_methodology_viewed",
+  "investor_contact_founder_clicked",
 ] as const;
 
 export type ProductEventName = (typeof PRODUCT_EVENT_NAMES)[number];

@@ -93,14 +93,20 @@ async function loadEvents(range: AnalyticsRange, includeInternal = false) {
   if (from) q = q.gte("created_at", from);
   const { data, error } = await q;
   if (error || !data) return [];
-  return data as Array<{
+  const rows = data as Array<{
     event_name: ProductEventName;
     invite_id: string | null;
     user_id: string | null;
     created_at: string;
     session_id: string;
     page: string | null;
+    session_type?: string | null;
   }>;
+  return rows.filter(
+    (row) =>
+      row.session_type !== "investor_preview" &&
+      !String(row.event_name).startsWith("investor_")
+  );
 }
 
 async function loadSessions(range: AnalyticsRange, includeInternal = false) {
@@ -113,7 +119,17 @@ async function loadSessions(range: AnalyticsRange, includeInternal = false) {
   const from = since(range);
   if (from) q = q.gte("started_at", from);
   const { data, error } = await q;
-  return error || !data ? [] : data;
+  if (error || !data) return [];
+  return (
+    data as Array<{
+      session_type?: string | null;
+      invite_id?: string | null;
+      user_id?: string | null;
+      started_at?: string;
+      last_activity_at?: string;
+      engaged_seconds?: number;
+    }>
+  ).filter((row) => row.session_type !== "investor_preview");
 }
 
 function uniqueOwners(rows: Array<{ invite_id: string | null; user_id: string | null }>) {

@@ -9,17 +9,21 @@ import { CopilotPanel } from "@/components/copilot/CopilotPanel";
 import { BetaBadge } from "@/components/beta/BetaBadge";
 import { ExitBetaButton } from "@/components/beta/ExitBetaButton";
 import { BetaIdentityBanner } from "@/components/beta/BetaIdentityBanner";
+import { InvestorPreviewBanner } from "@/components/investor/InvestorPreviewBanner";
 import { ProductAnalyticsProvider } from "@/components/analytics/ProductAnalyticsProvider";
+import { investorContactEmail } from "@/lib/env";
 
 export function AppShell({
   children,
   betaMode = false,
   adminMode = false,
+  investorMode = false,
 }: {
   children: React.ReactNode;
   betaMode?: boolean;
   /** Renders a subtle "Return to Admin" control. Only pass true for authorized admins. */
   adminMode?: boolean;
+  investorMode?: boolean;
 }) {
   return (
     <CopilotProvider>
@@ -49,6 +53,9 @@ export function AppShell({
             </div>
           )}
           {betaMode && <BetaIdentityBanner />}
+          {investorMode && (
+            <InvestorPreviewBanner contactEmail={investorContactEmail()} />
+          )}
           <main className="relative flex-1 p-6 gradient-mesh">
             <OmegaWatermark />
             <div className="relative z-10">{children}</div>

@@ -70,6 +70,9 @@ export default async function AdminProductPage({
         <Link href="/admin/product/retention" className="rounded-md border px-2.5 py-1">
           Retention
         </Link>
+        <Link href="/admin/product/investors" className="rounded-md border px-2.5 py-1">
+          Investor Preview
+        </Link>
         <a href="/api/admin/export/product" className="rounded-md border px-2.5 py-1">
           Export CSV
         </a>

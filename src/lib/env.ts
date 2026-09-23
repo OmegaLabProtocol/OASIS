@@ -91,6 +91,19 @@ export function cronSecret(): string {
   return process.env.CRON_SECRET?.trim() ?? "";
 }
 
+/** Kill switch for Investor Preview session creation. Explicit `true` only. */
+export function investorPreviewEnabled(): boolean {
+  return process.env.INVESTOR_PREVIEW_ENABLED?.trim() === "true";
+}
+
+/** Public founder inbox for Investor Preview Contact Founder. */
+export function investorContactEmail(): string {
+  return (
+    process.env.NEXT_PUBLIC_INVESTOR_CONTACT_EMAIL?.trim() ||
+    "omegalabsblockchain@gmail.com"
+  );
+}
+
 function stripTrailingSlash(value: string): string {
   return value.endsWith("/") ? value.slice(0, -1) : value;
 }

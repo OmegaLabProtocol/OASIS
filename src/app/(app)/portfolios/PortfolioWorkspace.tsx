@@ -10,18 +10,37 @@ import { analyzePortfolio } from "@/lib/portfolio/score";
 import type { PortfolioRecord } from "@/lib/workspace/portfolios";
 import type { ORIResult } from "@/lib/ori/types";
 import { trackProductEvent } from "@/components/analytics/ProductAnalyticsProvider";
+import {
+  applyLocalPortfolioAction,
+  readLocalPortfolios,
+  writeLocalPortfolios,
+  type LocalPortfolio,
+} from "@/lib/investor/localPortfolios";
 
 export function PortfolioWorkspace({
   initialPortfolios,
   results,
+  localOnly = false,
 }: {
   initialPortfolios: PortfolioRecord[];
   results: ORIResult[];
+  /** Investor Preview (no persistable user_id/invite_id): session-only. */
+  localOnly?: boolean;
 }) {
-  const [portfolios, setPortfolios] = React.useState(initialPortfolios);
-  const [selectedId, setSelectedId] = React.useState(initialPortfolios[0]?.id ?? "");
+  const [portfolios, setPortfolios] = React.useState<PortfolioRecord[]>(() => {
+    if (localOnly && initialPortfolios.length === 0) {
+      return readLocalPortfolios() as PortfolioRecord[];
+    }
+    return initialPortfolios;
+  });
+  const [selectedId, setSelectedId] = React.useState(() => {
+    if (initialPortfolios[0]?.id) return initialPortfolios[0].id;
+    if (localOnly) return readLocalPortfolios()[0]?.id ?? "";
+    return "";
+  });
   const [newName, setNewName] = React.useState("");
   const [addSymbol, setAddSymbol] = React.useState(results[0]?.symbol ?? "ETH");
+  const localModeRef = React.useRef(localOnly);
   const byKey = React.useMemo(
     () => Object.fromEntries(results.map((r) => [r.assetId, r]).concat(results.map((r) => [r.symbol, r]))),
     [results]
@@ -44,7 +63,18 @@ export function PortfolioWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
+  function commitLocal(next: LocalPortfolio[], selectId?: string) {
+    localModeRef.current = true;
+    writeLocalPortfolios(next);
+    setPortfolios(next as PortfolioRecord[]);
+    if (selectId) setSelectedId(selectId);
+  }
+
   async function refresh() {
+    if (localModeRef.current) {
+      setPortfolios(readLocalPortfolios() as PortfolioRecord[]);
+      return;
+    }
     const res = await fetch("/api/workspace/portfolios");
     const data = await res.json();
     setPortfolios(data.portfolios ?? []);
@@ -52,27 +82,52 @@ export function PortfolioWorkspace({
 
   async function create() {
     if (!newName.trim()) return;
-    const res = await fetch("/api/workspace/portfolios", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "create", name: newName.trim() }),
+    if (!localModeRef.current) {
+      const res = await fetch("/api/workspace/portfolios", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "create", name: newName.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.portfolio) {
+          setPortfolios((p) => [data.portfolio, ...p]);
+          setSelectedId(data.portfolio.id);
+          setNewName("");
+          trackProductEvent("portfolio_created", { portfolioId: data.portfolio.id });
+          return;
+        }
+      }
+      if (res.status !== 401 && res.status !== 403) return;
+      localModeRef.current = true;
+    }
+    const next = applyLocalPortfolioAction(portfolios, {
+      action: "create",
+      name: newName.trim(),
     });
-    const data = await res.json();
-    if (data.portfolio) {
-      setPortfolios((p) => [data.portfolio, ...p]);
-      setSelectedId(data.portfolio.id);
-      setNewName("");
-      trackProductEvent("portfolio_created", { portfolioId: data.portfolio.id });
+    const created = next.find((p) => !portfolios.some((x) => x.id === p.id));
+    commitLocal(next, created?.id);
+    setNewName("");
+    if (created) {
+      trackProductEvent("portfolio_created", { portfolioId: created.id });
     }
   }
 
   async function mutate(body: Record<string, unknown>) {
-    await fetch("/api/workspace/portfolios", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    await refresh();
+    if (!localModeRef.current) {
+      const res = await fetch("/api/workspace/portfolios", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        await refresh();
+        return;
+      }
+      if (res.status !== 401 && res.status !== 403) return;
+    }
+    const next = applyLocalPortfolioAction(portfolios, body);
+    commitLocal(next, selectedId);
   }
 
   async function updateWeight(assetKey: string, weight: number) {

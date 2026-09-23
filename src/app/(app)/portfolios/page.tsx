@@ -23,7 +23,11 @@ export default async function PortfoliosPage() {
           ORI. This is risk intelligence, not a trading blotter.
         </p>
       </div>
-      <PortfolioWorkspace initialPortfolios={portfolios} results={results} />
+      <PortfolioWorkspace
+        initialPortfolios={portfolios}
+        results={results}
+        localOnly={!owner}
+      />
     </div>
   );
 }

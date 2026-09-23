@@ -10,7 +10,11 @@ export default async function AppLayout({
   // unauthorized visitors to the public landing with the beta gate flagged.
   const access = await requireAppAccess();
   return (
-    <AppShell betaMode={access === "beta"} adminMode={access === "admin"}>
+    <AppShell
+      betaMode={access === "beta"}
+      adminMode={access === "admin"}
+      investorMode={access === "investor"}
+    >
       {children}
     </AppShell>
   );
