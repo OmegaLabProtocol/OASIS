@@ -38,8 +38,14 @@ const CAPABILITIES = [
   },
 ] as const;
 
-export function InvestorOverview({ results }: { results: ORIResult[] }) {
-  const example = selectOriExample(results);
+export function InvestorOverview({
+  results,
+  exampleCandidates,
+}: {
+  results: ORIResult[];
+  exampleCandidates: ORIResult[];
+}) {
+  const example = selectOriExample(exampleCandidates);
   const oriHref = example ? `/tokens/${example.symbol}` : "/screener";
 
   return (

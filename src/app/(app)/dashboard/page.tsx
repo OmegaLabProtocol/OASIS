@@ -19,6 +19,7 @@ import {
   buildAllORIResults,
   buildAssetOverviewORIResults,
 } from "@/lib/ori/service";
+import { buildScreenerORIResults } from "@/lib/ori/universe";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -26,8 +27,16 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   const access = await resolveAppAccess();
   if (access === "investor") {
-    const overviewResults = await buildAssetOverviewORIResults();
-    return <InvestorOverview results={overviewResults} />;
+    const [overviewResults, exampleCandidates] = await Promise.all([
+      buildAssetOverviewORIResults(),
+      buildScreenerORIResults(),
+    ]);
+    return (
+      <InvestorOverview
+        results={overviewResults}
+        exampleCandidates={exampleCandidates}
+      />
+    );
   }
 
   const [market, protocols, wallets, overviewResults, watchlistResults] =
