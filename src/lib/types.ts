@@ -29,11 +29,11 @@ export interface OriComponentScores {
 export interface OriMetrics extends OriComponentScores {
   symbol: string;
   name: string;
-  oriScore: number;
-  riskLabel: RiskLabel;
-  change24h: number;
-  change7d: number;
-  topRiskDriver: string;
+  oriScore: number | null;
+  riskLabel: RiskLabel | "Insufficient Data";
+  change24h: number | null;
+  change7d: number | null;
+  topRiskDriver: string | null;
   previousOriScore?: number;
   riskChangeReasons?: string[];
 }
@@ -88,10 +88,10 @@ export interface Alert {
 export interface WatchlistItem {
   symbol: string;
   oriScore: number;
-  change24h: number;
-  change7d: number;
+  change24h: number | null;
+  change7d: number | null;
   riskLabel: RiskLabel;
-  topRiskDriver: string;
+  topRiskDriver: string | null;
 }
 
 export interface HistoricalPoint {

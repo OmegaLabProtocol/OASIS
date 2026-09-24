@@ -30,7 +30,8 @@ export type ORICalculationType = "live" | "observed" | "backfilled";
 export interface ORICategoryScore {
   key: OriCategoryKey;
   label: string;
-  score: number;
+  score: number | null;
+  dimension: "structural" | "dynamic";
   /** Weight in the overall ORI (0..1). */
   weight: number;
   /** score × weight. */
@@ -63,6 +64,10 @@ export interface ORIDataConfidence {
   /** Human-readable, deterministic reasons behind the rating. */
   factors: string[];
   freshnessMinutes: number;
+  coverage: number;
+  freshness: number;
+  sourceQuality: number;
+  sourceAgreement: number;
 }
 
 /** A provider that contributed to the score. */
@@ -94,9 +99,16 @@ export interface ORIResult {
   chain?: string;
 
   // --- Score ---
-  currentScore: number;
+  currentScore: number | null;
   /** Alias of `currentScore` for the canonical contract vocabulary. */
-  overallScore: number;
+  overallScore: number | null;
+  publicationStatus: "published" | "insufficient_data";
+  /** Methodology-weighted evidence coverage, 0–1. Display only; not a score. */
+  weightedCoverage: number;
+  structuralScore: number | null;
+  dynamicScore: number | null;
+  baseOri: number | null;
+  eventAdjustment: number;
   previousScore: number | null;
   absoluteChange: number | null;
   /** 24h percent change. */
@@ -122,6 +134,24 @@ export interface ORIResult {
   dataConfidence: ORIDataConfidence;
   dataSources: ORIDataSourceRecord[];
   underlyingMetrics: ORIUnderlyingMetrics;
+  /** Metric-level evidence trail. Internal audit; not required in UI. */
+  evidence?: Array<{
+    metricId: string;
+    category: string;
+    structuralOrDynamic: "structural" | "dynamic";
+    weight: number;
+    applicability: string;
+    normalization: string;
+    directionality: string;
+    evidenceMode: string;
+    sourceTier: string;
+    source: string;
+    observedAt: string | null;
+    rawValue: number | null;
+    normalizedScore: number | null;
+    availability: string;
+    future?: boolean;
+  }>;
 
   // --- History & freshness ---
   history: ORIHistoryPoint[];

@@ -216,7 +216,9 @@ export function PortfolioWorkspace({
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardContent className="pt-5">
-                <div className="text-2xl font-light">{analysis.portfolioOri}</div>
+                <div className="text-2xl font-light">
+                  {analysis.portfolioOri ?? "—"}
+                </div>
                 <div className="text-xs text-muted-foreground">
                   Asset-Weighted Portfolio ORI
                 </div>
@@ -242,8 +244,12 @@ export function PortfolioWorkspace({
             </Card>
             <Card>
               <CardContent className="pt-5">
-                <div className="text-2xl font-light">{analysis.dataConfidence}</div>
-                <div className="text-xs text-muted-foreground">Data Confidence</div>
+                <div className="text-2xl font-light">
+                  {analysis.portfolioOriCoverage}%
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Portfolio ORI Coverage
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -310,9 +316,11 @@ export function PortfolioWorkspace({
                         }
                       />
                     </td>
-                    <td className="px-3 py-2 text-right font-mono">{h.ori}</td>
                     <td className="px-3 py-2 text-right font-mono">
-                      {h.weightedContribution}
+                      {h.ori ?? "—"}
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono">
+                      {h.weightedContribution ?? "—"}
                     </td>
                     <td className="px-3 py-2">{h.grade}</td>
                     <td className="px-3 py-2 text-muted-foreground">
@@ -355,7 +363,7 @@ export function PortfolioWorkspace({
               {analysis.categoryScores.map((c) => (
                 <div key={c.key} className="flex justify-between text-xs">
                   <span>{c.label}</span>
-                  <span className="font-mono">{c.score}</span>
+                  <span className="font-mono">{c.score ?? "—"}</span>
                 </div>
               ))}
             </CardContent>

@@ -4,7 +4,7 @@ import { getOriTier } from "@/lib/oriColors";
 import { cn } from "@/lib/utils";
 
 interface ScoreGaugeProps {
-  score: number;
+  score: number | null;
   size?: "sm" | "md" | "lg";
   label?: string;
 }
@@ -15,8 +15,9 @@ export function ScoreGauge({ score, size = "md", label = "ORI" }: ScoreGaugeProp
   const stroke = size === "sm" ? 6 : size === "md" ? 8 : 10;
   const radius = (dim - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (score / 100) * circumference;
-  const tier = getOriTier(score);
+  const published = score != null;
+  const offset = circumference - ((published ? score : 0) / 100) * circumference;
+  const tier = getOriTier(published ? score : 0);
 
   return (
     <div className="relative inline-flex flex-col items-center">
@@ -53,7 +54,7 @@ export function ScoreGauge({ score, size = "md", label = "ORI" }: ScoreGaugeProp
             size === "sm" ? "text-xl" : size === "md" ? "text-3xl" : "text-4xl"
           )}
         >
-          {score}
+          {published ? score : "—"}
         </span>
         <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
           {label}

@@ -62,7 +62,7 @@ export async function GET(
     })),
     message:
       rows.length === 0
-        ? "Historical ORI observations are being collected. Longer time ranges will become available as verified history accumulates."
+        ? "Historical ORI unavailable"
         : undefined,
   });
 }

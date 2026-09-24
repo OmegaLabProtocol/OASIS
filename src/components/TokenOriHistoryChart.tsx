@@ -7,23 +7,31 @@ import type { ORIResult } from "@/lib/ori/types";
 import type { HistoricalPoint } from "@/lib/types";
 
 /**
- * ORI history chart sourced from the shared hook. The last point always equals
- * the current ORI score because both come from the same ORIResult.
+ * Observed ORI history only. Empty until persisted snapshots exist.
  */
 export function TokenOriHistoryChart({
   symbol,
   initial,
-  fallbackData,
   title,
   color,
 }: {
   symbol: string;
   initial?: ORIResult;
-  fallbackData: HistoricalPoint[];
+  fallbackData?: HistoricalPoint[];
   title: string;
   color?: string;
 }) {
   const { history } = useORIHistory(symbol, initial ? [initial] : undefined);
-  const data = history.length > 0 ? historyToPoints(history) : fallbackData;
+  const data = historyToPoints(history);
+  if (data.length === 0) {
+    return (
+      <div>
+        <p className="mb-2 text-xs uppercase tracking-wider text-muted-foreground">
+          {title}
+        </p>
+        <p className="text-sm text-muted-foreground">Historical ORI unavailable</p>
+      </div>
+    );
+  }
   return <HistoricalChart data={data} title={title} color={color} />;
 }

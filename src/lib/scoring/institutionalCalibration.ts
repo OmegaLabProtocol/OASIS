@@ -81,7 +81,7 @@ function institutionalMaturityFactor(symbol: string): number {
       (TIER_BASE[entry.marketTier] ?? 0.55) +
       (CATEGORY_BUMP[entry.protocolCategory] ?? 0);
   }
-  const jitter = symbolVariation(symbol, "marketLiquidity") / 100; // ±0.03
+  const jitter = symbolVariation(symbol, "market") / 100; // ±0.03
   return Math.max(0.1, Math.min(0.97, base + jitter));
 }
 

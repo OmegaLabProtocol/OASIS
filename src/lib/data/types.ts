@@ -111,12 +111,15 @@ export interface CryptoRankData {
 }
 
 export interface OriCategoryScores {
-  marketLiquidity: number;
-  protocolFundamentals: number;
-  holderDistribution: number;
-  governance: number;
-  developerActivity: number;
-  supplyRisk: number;
+  tokenomics: number | null;
+  ownership: number | null;
+  governance: number | null;
+  resilience: number | null;
+  institutional: number | null;
+  market: number | null;
+  liquidity: number | null;
+  onChain: number | null;
+  protocol: number | null;
 }
 
 export type OriCategoryStatus =
@@ -158,7 +161,7 @@ export interface OriLookupResult {
   chain: string;
   address: string;
   symbol: string;
-  oriScore: number;
+  oriScore: number | null;
   confidence: ConfidenceLevel;
   confidenceScore: number;
   categoryScores: OriCategoryScores;
@@ -179,8 +182,38 @@ export interface OriLookupResult {
   mockDataDisclaimer: string;
   categoryProvenance?: Record<keyof OriCategoryScores, string>;
   fieldProvenance?: Record<keyof OriCategoryScores, CategoryFieldProvenance>;
-  /** CryptoRank fields that contributed to scoring (supply / unlock / dilution). */
   cryptoRankFieldsUsed?: string[];
+  publicationStatus: "published" | "insufficient_data";
+  structuralScore: number | null;
+  dynamicScore: number | null;
+  baseOri: number | null;
+  eventAdjustment: number;
+  weightedCoverage: number;
+  confidenceBreakdown: {
+    overall: number;
+    coverage: number;
+    freshness: number;
+    sourceQuality: number;
+    sourceAgreement: number;
+  };
+  /** Full metric evidence trail for internal audit. Not required in UI. */
+  evidence: Array<{
+    metricId: string;
+    category: string;
+    structuralOrDynamic: "structural" | "dynamic";
+    weight: number;
+    applicability: string;
+    normalization: string;
+    directionality: string;
+    evidenceMode: string;
+    sourceTier: string;
+    source: string;
+    observedAt: string | null;
+    rawValue: number | null;
+    normalizedScore: number | null;
+    availability: string;
+    future?: boolean;
+  }>;
 }
 
 export interface NormalizedTokenData {

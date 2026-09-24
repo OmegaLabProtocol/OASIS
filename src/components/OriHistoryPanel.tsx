@@ -38,10 +38,9 @@ interface HistoryPayload {
 
 export function OriHistoryPanel({
   symbol,
-  fallback,
 }: {
   symbol: string;
-  fallback: HistoricalPoint[];
+  fallback?: HistoricalPoint[];
 }) {
   const [range, setRange] = React.useState<Range>("1M");
   const [series, setSeries] = React.useState<"overall" | string>("overall");
@@ -190,13 +189,7 @@ export function OriHistoryPanel({
           </>
         ) : (
           <p className="text-sm text-muted-foreground">
-            {history?.message ??
-              "Historical ORI observations are being collected. Longer time ranges will become available as verified history accumulates."}
-          </p>
-        )}
-        {!persisted && fallback.length > 0 && (
-          <p className="text-[10px] text-muted-foreground">
-            In-session illustrative path is not shown as verified history.
+            {history?.message ?? "Historical ORI unavailable"}
           </p>
         )}
       </CardContent>

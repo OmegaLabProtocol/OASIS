@@ -63,9 +63,9 @@ function buildScoreDrivers(
     const weight = ORI_CATEGORY_WEIGHTS[key];
     return {
       category: ORI_CATEGORY_LABELS[key],
-      score,
+      score: score ?? 0,
       weight,
-      weightedContribution: Math.round(score * weight * 10) / 10,
+      weightedContribution: score == null ? 0 : Math.round(score * weight * 10) / 10,
       provenance: lookup?.categoryMetadata?.[key]?.status ?? "unknown",
       explanation: lookup?.explanation?.[key] ?? null,
     };
@@ -225,7 +225,7 @@ export interface ScreeningRow {
   chain: string;
   category: string;
   marketTier: string;
-  ori: number;
+  ori: number | null;
   grade: string;
   riskTier: string;
   percentChange: number | null;
@@ -255,5 +255,5 @@ export async function buildScreeningContext(): Promise<ScreeningRow[]> {
         dataSource: r.dataSource,
       };
     })
-    .sort((a, b) => b.ori - a.ori);
+    .sort((a, b) => (b.ori ?? -1) - (a.ori ?? -1));
 }

@@ -160,7 +160,7 @@ export function DataSourcesTrustPanel({ oriResult }: DataSourcesTrustPanelProps)
                 (key) => (
                   <div key={key} className="text-xs">
                     <span className="font-medium">
-                      {ORI_CATEGORY_LABELS[key]} ({oriResult.categoryScores[key]}/100):
+                      {ORI_CATEGORY_LABELS[key]} ({oriResult.categoryScores[key] ?? "—"}/100):
                     </span>{" "}
                     <span className="text-muted-foreground">
                       {oriResult.explanation[key]}

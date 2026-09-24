@@ -18,6 +18,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { BetaProvider } from "@/components/beta/BetaProvider";
 import { BetaGateWatcher } from "@/components/beta/BetaGateWatcher";
 import { BetaCtaButton } from "@/components/beta/BetaCtaButton";
+import { getInvestorSession } from "@/lib/investor/authorization";
 import {
   APP_NAME,
   APP_FULL_NAME,
@@ -39,7 +40,9 @@ const features = [
   { icon: Code2, title: "API Intelligence Layer", desc: "Programmatic access for risk systems, due diligence, and compliance." },
 ];
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const investor = await getInvestorSession();
+
   return (
     <BetaProvider>
       <BetaGateWatcher />
@@ -60,9 +63,18 @@ export default function LandingPage() {
               Methodology
             </Link>
             <ThemeToggle />
-            <BetaCtaButton size="sm" target="/dashboard">
-              Launch Dashboard
-            </BetaCtaButton>
+            {investor ? (
+              <Link
+                href="/dashboard"
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Continue Investor Preview
+              </Link>
+            ) : (
+              <BetaCtaButton size="sm" target="/dashboard">
+                Launch Dashboard
+              </BetaCtaButton>
+            )}
           </div>
         </div>
       </header>
@@ -79,9 +91,17 @@ export default function LandingPage() {
           into institutional-grade intelligence powered by the Omega Risk Index.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <BetaCtaButton size="lg" className="gap-2" target="/dashboard">
-            Launch Dashboard <ArrowRight className="h-4 w-4" />
-          </BetaCtaButton>
+          {investor ? (
+            <Button asChild size="lg" className="gap-2">
+              <Link href="/dashboard">
+                Continue Investor Preview <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+          ) : (
+            <BetaCtaButton size="lg" className="gap-2" target="/dashboard">
+              Launch Dashboard <ArrowRight className="h-4 w-4" />
+            </BetaCtaButton>
+          )}
           <Button asChild variant="outline" size="lg">
             <Link href="/methodology">View Methodology</Link>
           </Button>
@@ -107,22 +127,42 @@ export default function LandingPage() {
       <section className="mx-auto max-w-6xl px-6 py-16 border-t border-border">
         <h2 className="text-2xl font-light tracking-tight mb-2">How ORI Works</h2>
         <p className="text-sm text-muted-foreground max-w-3xl mb-8">{ORI_BENCHMARK_COPY}</p>
-        <div className="grid gap-6 md:grid-cols-3">
-          {[
-            { w: "25%", label: "Liquidity Stability" },
-            { w: "20%", label: "Market Integrity" },
-            { w: "15%", label: "Smart Money Positioning" },
-            { w: "15%", label: "Volatility Risk" },
-            { w: "10%", label: "Holder Concentration" },
-            { w: "10%", label: "Social Sentiment Divergence" },
-            { w: "5%", label: "Protocol Exposure Risk" },
-          ].map((c) => (
-            <div key={c.label} className="flex items-center gap-3 text-sm">
-              <span className="font-mono text-xs w-10">{c.w}</span>
-              <span>{c.label}</span>
-            </div>
-          ))}
+        <div className="grid gap-6 md:grid-cols-2">
+          <div>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
+              Structural Risk — 40%
+            </p>
+            {[
+              { w: "25%", label: "Tokenomics" },
+              { w: "20%", label: "Ownership & Concentration" },
+              { w: "20%", label: "Governance & Control" },
+              { w: "25%", label: "Protocol / Network Resilience" },
+              { w: "10%", label: "Institutional & Market Structure" },
+            ].map((c) => (
+              <div key={c.label} className="flex items-center gap-3 text-sm py-1">
+                <span className="font-mono text-xs w-10">{c.w}</span>
+                <span>{c.label}</span>
+              </div>
+            ))}
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
+              Dynamic Risk — 60%
+            </p>
+            {[
+              { w: "30%", label: "Market Risk" },
+              { w: "30%", label: "Liquidity Risk" },
+              { w: "20%", label: "On-Chain Risk" },
+              { w: "20%", label: "Protocol / Network Risk" },
+            ].map((c) => (
+              <div key={c.label} className="flex items-center gap-3 text-sm py-1">
+                <span className="font-mono text-xs w-10">{c.w}</span>
+                <span>{c.label}</span>
+              </div>
+            ))}
+          </div>
         </div>
+        <p className="mt-6 font-mono text-sm">Base ORI = 40% Structural + 60% Dynamic</p>
       </section>
 
       <section className="mx-auto max-w-6xl px-6 py-16 grid md:grid-cols-2 gap-12">
@@ -176,9 +216,15 @@ export default function LandingPage() {
           OASIS is built for recurring SaaS revenue, API licensing, and institutional workflow
           dependency — the operating system for digital asset risk teams.
         </p>
-        <BetaCtaButton size="lg" mode="request" target="/dashboard">
-          Request Beta Access
-        </BetaCtaButton>
+        {investor ? (
+          <Button asChild size="lg">
+            <Link href="/dashboard">Continue Investor Preview</Link>
+          </Button>
+        ) : (
+          <BetaCtaButton size="lg" mode="request" target="/dashboard">
+            Request Beta Access
+          </BetaCtaButton>
+        )}
       </section>
 
       <footer className="border-t border-border py-8 px-6">

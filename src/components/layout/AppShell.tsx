@@ -10,6 +10,7 @@ import { BetaBadge } from "@/components/beta/BetaBadge";
 import { ExitBetaButton } from "@/components/beta/ExitBetaButton";
 import { BetaIdentityBanner } from "@/components/beta/BetaIdentityBanner";
 import { InvestorPreviewBanner } from "@/components/investor/InvestorPreviewBanner";
+import { InvestorMobileNav } from "@/components/investor/InvestorMobileNav";
 import { ProductAnalyticsProvider } from "@/components/analytics/ProductAnalyticsProvider";
 import { investorContactEmail } from "@/lib/env";
 
@@ -29,7 +30,7 @@ export function AppShell({
     <CopilotProvider>
       <ProductAnalyticsProvider>
       <div className="min-h-screen bg-background">
-        <SidebarNavigation />
+        <SidebarNavigation investorMode={investorMode} />
         <div className="lg:pl-56 flex flex-col min-h-screen">
           <AppHeader />
           {adminMode && (
@@ -54,7 +55,10 @@ export function AppShell({
           )}
           {betaMode && <BetaIdentityBanner />}
           {investorMode && (
-            <InvestorPreviewBanner contactEmail={investorContactEmail()} />
+            <>
+              <InvestorPreviewBanner contactEmail={investorContactEmail()} />
+              <InvestorMobileNav />
+            </>
           )}
           <main className="relative flex-1 p-6 gradient-mesh">
             <OmegaWatermark />

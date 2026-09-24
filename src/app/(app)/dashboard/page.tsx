@@ -6,8 +6,10 @@ import { WalletActivityFeed } from "@/components/WalletActivityFeed";
 import { ProtocolHealthCard } from "@/components/ProtocolHealthCard";
 import { DataConfidenceBadge } from "@/components/DataConfidenceBadge";
 import { DashboardOriOverview } from "@/components/DashboardOriOverview";
+import { InvestorOverview } from "@/components/investor/InvestorOverview";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ORI_BENCHMARK_COPY } from "@/lib/constants";
+import { resolveAppAccess } from "@/lib/beta/access";
 import {
   getLiveMarketOverview,
   getLiveProtocols,
@@ -22,6 +24,12 @@ import Link from "next/link";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
+  const access = await resolveAppAccess();
+  if (access === "investor") {
+    const overviewResults = await buildAssetOverviewORIResults();
+    return <InvestorOverview results={overviewResults} />;
+  }
+
   const [market, protocols, wallets, overviewResults, watchlistResults] =
     await Promise.all([
       getLiveMarketOverview(),

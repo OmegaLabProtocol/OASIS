@@ -43,7 +43,10 @@ function formatUsd(value: number | undefined): string {
   return `$${formatNumber(value)}`;
 }
 
-function oriRatingCommentary(oriScore: number): string {
+function oriRatingCommentary(oriScore: number | null): string {
+  if (oriScore == null) {
+    return "Insufficient live evidence to publish a Methodology v1.0 ORI.";
+  }
   if (oriScore >= 90) {
     return "Exceptional liquidity, maturity, decentralization, ecosystem strength, and protocol resilience.";
   }
@@ -65,7 +68,8 @@ function oriRatingCommentary(oriScore: number): string {
   return "Extremely weak ecosystem fundamentals and elevated probability of long-term instability or failure.";
 }
 
-function scoreAssessment(score: number): string {
+function scoreAssessment(score: number | null): string {
+  if (score == null) return "unpublished";
   if (score >= 75) return "favorable";
   if (score >= 55) return "moderate";
   if (score >= 40) return "elevated";
@@ -109,7 +113,7 @@ export function generateDemoIntelligenceReport(
     redFlags.push("No critical red flags flagged in current ORI dataset");
 
   const monitoring: string[] = [
-    `Track ORI score trajectory (current: ${metrics.oriScore}, 24h change: ${metrics.change24h > 0 ? "+" : ""}${metrics.change24h})`,
+    `Track ORI score trajectory (current: ${metrics.oriScore}, 24h change: ${metrics.change24h == null ? "unavailable" : `${metrics.change24h > 0 ? "+" : ""}${metrics.change24h}`})`,
     `Monitor liquidity depth (${formatUsd(raw.liquidityDepthUsd)}) and slippage on $1M trades (${raw.slippage1m}%)`,
     `Watch smart money net flow (30d: ${raw.smartMoneyNetFlow30d > 0 ? "+" : ""}${raw.smartMoneyNetFlow30d})`,
     `Review holder concentration trends (top 10: ${formatPct(raw.top10HolderPercent)})`,
@@ -128,7 +132,7 @@ ${metrics.name} (${metrics.symbol}) carries an Omega Risk Index (ORI) score of *
 The composite ORI score reflects a ${scoreAssessment(metrics.oriScore)} institutional risk profile. Component breakdown:
 ${componentLines(components)}
 
-Primary risk driver: ${metrics.topRiskDriver || "Data unavailable"}. 24-hour change: ${metrics.change24h > 0 ? "+" : ""}${metrics.change24h}; 7-day change: ${metrics.change7d > 0 ? "+" : ""}${metrics.change7d}.
+Primary risk driver: ${metrics.topRiskDriver || "Data unavailable"}. 24-hour change: ${metrics.change24h == null ? "unavailable" : `${metrics.change24h > 0 ? "+" : ""}${metrics.change24h}`}; 7-day change: ${metrics.change7d == null ? "unavailable" : `${metrics.change7d > 0 ? "+" : ""}${metrics.change7d}`}.
 
 ## Liquidity Risk Analysis
 
@@ -228,7 +232,7 @@ function formatPrintBody(body: string): string {
 export function printReportAsPdf(options: {
   assetName: string;
   symbol: string;
-  oriScore: number;
+  oriScore: number | null;
   riskLabel: string;
   report: string;
   reportSource?: "openai" | "demo";
@@ -326,7 +330,7 @@ export function printReportAsPdf(options: {
     <p class="eyebrow">OASIS · Omega Risk Index Intelligence</p>
     <h1>${escapeHtml(options.assetName)} (${escapeHtml(options.symbol)})</h1>
     <p class="meta">Confidential · For qualified institutional use · ${escapeHtml(generatedAt)} · ${escapeHtml(sourceLabel)}</p>
-    <p class="score-row">ORI Score: <strong>${options.oriScore}/100</strong> · Risk Rating: <strong>${escapeHtml(options.riskLabel)}</strong></p>
+    <p class="score-row">ORI Score: <strong>${options.oriScore == null ? "Insufficient Data" : `${options.oriScore}/100`}</strong> · Risk Rating: <strong>${escapeHtml(options.riskLabel)}</strong></p>
   </div>
   ${sectionHtml}
   <p class="disclaimer">OASIS provides informational analytics only and does not provide financial, investment, legal, or tax advice. OASIS is non-custodial and does not hold user assets.</p>

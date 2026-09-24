@@ -1,16 +1,38 @@
-import type { NormalizedTokenData, OriCategoryScores } from "./types";
+import type { OriCategoryScores } from "./types";
 
 export type ProtocolType = "l1" | "l2" | "dex" | "lending" | "generic";
 
 export interface ProtocolPersonality {
   symbol: string;
   type: ProtocolType;
-  /** Target ORI when estimation layers are active */
   oriAnchor: number;
   oriFloor: number;
   categoryAnchors: OriCategoryScores;
-  /** Category-specific adjustment (-10 to +10) applied after formula scoring */
   categoryModifiers: OriCategoryScores;
+}
+
+function scores(
+  tokenomics: number,
+  ownership: number,
+  governance: number,
+  resilience: number,
+  institutional: number,
+  market: number,
+  liquidity: number,
+  onChain: number,
+  protocol: number
+): OriCategoryScores {
+  return {
+    tokenomics,
+    ownership,
+    governance,
+    resilience,
+    institutional,
+    market,
+    liquidity,
+    onChain,
+    protocol,
+  };
 }
 
 const PERSONALITIES: Record<string, ProtocolPersonality> = {
@@ -19,176 +41,64 @@ const PERSONALITIES: Record<string, ProtocolPersonality> = {
     type: "l1",
     oriAnchor: 92,
     oriFloor: 88,
-    categoryAnchors: {
-      marketLiquidity: 95,
-      protocolFundamentals: 90,
-      holderDistribution: 91,
-      governance: 82,
-      developerActivity: 88,
-      supplyRisk: 93,
-    },
-    categoryModifiers: {
-      marketLiquidity: 4,
-      protocolFundamentals: 2,
-      holderDistribution: 3,
-      governance: -2,
-      developerActivity: 1,
-      supplyRisk: 3,
-    },
+    categoryAnchors: scores(93, 91, 82, 88, 95, 95, 95, 91, 90),
+    categoryModifiers: scores(3, 3, -2, 1, 4, 4, 4, 3, 2),
   },
   ETH: {
     symbol: "ETH",
     type: "l1",
     oriAnchor: 91,
     oriFloor: 87,
-    categoryAnchors: {
-      marketLiquidity: 94,
-      protocolFundamentals: 91,
-      holderDistribution: 89,
-      governance: 86,
-      developerActivity: 95,
-      supplyRisk: 88,
-    },
-    categoryModifiers: {
-      marketLiquidity: 5,
-      protocolFundamentals: 3,
-      holderDistribution: 4,
-      governance: 3,
-      developerActivity: 6,
-      supplyRisk: 2,
-    },
+    categoryAnchors: scores(88, 89, 86, 95, 94, 94, 94, 89, 91),
+    categoryModifiers: scores(2, 4, 3, 6, 5, 5, 5, 4, 3),
   },
   SOL: {
     symbol: "SOL",
     type: "l1",
     oriAnchor: 82,
     oriFloor: 74,
-    categoryAnchors: {
-      marketLiquidity: 88,
-      protocolFundamentals: 78,
-      holderDistribution: 72,
-      governance: 68,
-      developerActivity: 90,
-      supplyRisk: 74,
-    },
-    categoryModifiers: {
-      marketLiquidity: 3,
-      protocolFundamentals: 0,
-      holderDistribution: -4,
-      governance: -6,
-      developerActivity: 8,
-      supplyRisk: -2,
-    },
+    categoryAnchors: scores(74, 72, 68, 90, 88, 88, 88, 72, 78),
+    categoryModifiers: scores(-2, -4, -6, 8, 3, 3, 3, -4, 0),
   },
   UNI: {
     symbol: "UNI",
     type: "dex",
     oriAnchor: 79,
     oriFloor: 72,
-    categoryAnchors: {
-      marketLiquidity: 89,
-      protocolFundamentals: 84,
-      holderDistribution: 74,
-      governance: 63,
-      developerActivity: 65,
-      supplyRisk: 76,
-    },
-    categoryModifiers: {
-      marketLiquidity: 6,
-      protocolFundamentals: 4,
-      holderDistribution: 0,
-      governance: -8,
-      developerActivity: -5,
-      supplyRisk: 1,
-    },
+    categoryAnchors: scores(76, 74, 63, 65, 89, 89, 89, 74, 84),
+    categoryModifiers: scores(1, 0, -8, -5, 6, 6, 6, 0, 4),
   },
   AAVE: {
     symbol: "AAVE",
     type: "lending",
     oriAnchor: 81,
     oriFloor: 74,
-    categoryAnchors: {
-      marketLiquidity: 76,
-      protocolFundamentals: 91,
-      holderDistribution: 77,
-      governance: 74,
-      developerActivity: 72,
-      supplyRisk: 80,
-    },
-    categoryModifiers: {
-      marketLiquidity: 0,
-      protocolFundamentals: 8,
-      holderDistribution: 2,
-      governance: 0,
-      developerActivity: -2,
-      supplyRisk: 3,
-    },
+    categoryAnchors: scores(80, 77, 74, 72, 76, 76, 76, 77, 91),
+    categoryModifiers: scores(3, 2, 0, -2, 0, 0, 0, 2, 8),
   },
   ARB: {
     symbol: "ARB",
     type: "l2",
     oriAnchor: 76,
     oriFloor: 70,
-    categoryAnchors: {
-      marketLiquidity: 78,
-      protocolFundamentals: 80,
-      holderDistribution: 70,
-      governance: 70,
-      developerActivity: 82,
-      supplyRisk: 72,
-    },
-    categoryModifiers: {
-      marketLiquidity: 1,
-      protocolFundamentals: 2,
-      holderDistribution: -2,
-      governance: -2,
-      developerActivity: 4,
-      supplyRisk: -3,
-    },
+    categoryAnchors: scores(72, 70, 70, 82, 78, 78, 78, 70, 80),
+    categoryModifiers: scores(-3, -2, -2, 4, 1, 1, 1, -2, 2),
   },
   OP: {
     symbol: "OP",
     type: "l2",
     oriAnchor: 75,
     oriFloor: 69,
-    categoryAnchors: {
-      marketLiquidity: 74,
-      protocolFundamentals: 77,
-      holderDistribution: 71,
-      governance: 78,
-      developerActivity: 80,
-      supplyRisk: 71,
-    },
-    categoryModifiers: {
-      marketLiquidity: -1,
-      protocolFundamentals: 1,
-      holderDistribution: -1,
-      governance: 5,
-      developerActivity: 3,
-      supplyRisk: -2,
-    },
+    categoryAnchors: scores(71, 71, 78, 80, 74, 74, 74, 71, 77),
+    categoryModifiers: scores(-2, -1, 5, 3, -1, -1, -1, -1, 1),
   },
   LINK: {
     symbol: "LINK",
     type: "generic",
     oriAnchor: 78,
     oriFloor: 72,
-    categoryAnchors: {
-      marketLiquidity: 82,
-      protocolFundamentals: 79,
-      holderDistribution: 75,
-      governance: 72,
-      developerActivity: 78,
-      supplyRisk: 77,
-    },
-    categoryModifiers: {
-      marketLiquidity: 2,
-      protocolFundamentals: 1,
-      holderDistribution: 0,
-      governance: 0,
-      developerActivity: 2,
-      supplyRisk: 1,
-    },
+    categoryAnchors: scores(77, 75, 72, 78, 82, 82, 82, 75, 79),
+    categoryModifiers: scores(1, 0, 0, 2, 2, 2, 2, 0, 1),
   },
 };
 
@@ -197,29 +107,14 @@ const DEFAULT_PERSONALITY = (symbol: string): ProtocolPersonality => ({
   type: "generic",
   oriAnchor: 58,
   oriFloor: 45,
-  categoryAnchors: {
-    marketLiquidity: 55,
-    protocolFundamentals: 52,
-    holderDistribution: 50,
-    governance: 48,
-    developerActivity: 52,
-    supplyRisk: 50,
-  },
-  categoryModifiers: {
-    marketLiquidity: 0,
-    protocolFundamentals: 0,
-    holderDistribution: 0,
-    governance: 0,
-    developerActivity: 0,
-    supplyRisk: 0,
-  },
+  categoryAnchors: scores(50, 50, 48, 52, 55, 55, 55, 50, 52),
+  categoryModifiers: scores(0, 0, 0, 0, 0, 0, 0, 0, 0),
 });
 
 export function getProtocolPersonality(symbol: string): ProtocolPersonality {
   return PERSONALITIES[symbol.toUpperCase()] ?? DEFAULT_PERSONALITY(symbol);
 }
 
-/** Deterministic hash for minor differentiation within same tier */
 export function symbolVariation(symbol: string, category: keyof OriCategoryScores): number {
   const seed = symbol
     .split("")
@@ -231,28 +126,13 @@ export function symbolVariation(symbol: string, category: keyof OriCategoryScore
 export function getTypeWeightAdjustments(type: ProtocolType): Partial<OriCategoryScores> {
   switch (type) {
     case "l1":
-      return {
-        developerActivity: 1.08,
-        protocolFundamentals: 1.05,
-        holderDistribution: 1.04,
-      };
+      return { resilience: 1.08, protocol: 1.05, ownership: 1.04 };
     case "dex":
-      return {
-        marketLiquidity: 1.1,
-        governance: 1.05,
-        protocolFundamentals: 1.04,
-      };
+      return { market: 1.1, liquidity: 1.1, governance: 1.05, protocol: 1.04 };
     case "lending":
-      return {
-        protocolFundamentals: 1.12,
-        supplyRisk: 1.04,
-      };
+      return { protocol: 1.12, tokenomics: 1.04 };
     case "l2":
-      return {
-        protocolFundamentals: 1.06,
-        developerActivity: 1.04,
-        holderDistribution: 0.98,
-      };
+      return { protocol: 1.06, resilience: 1.04, ownership: 0.98 };
     default:
       return {};
   }

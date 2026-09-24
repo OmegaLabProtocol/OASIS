@@ -6,27 +6,111 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { AssetActions } from "@/components/actions/AssetActions";
 import { trackProductEvent } from "@/components/analytics/ProductAnalyticsProvider";
 import { applyScreenerFilters, describeFilters } from "@/lib/screener/filter";
-import type { SavedScreen, ScreenerFilters } from "@/lib/screener/types";
-import { ORI_CATEGORY_KEYS, ORI_CATEGORY_LABELS } from "@/lib/ori/methodology";
+import type { CategoryRange, SavedScreen, ScreenerFilters } from "@/lib/screener/types";
+import {
+  ORI_CATEGORY_DIMENSION,
+  ORI_CATEGORY_KEYS,
+  ORI_CATEGORY_LABELS,
+} from "@/lib/ori/methodology";
+import type { OriCategoryKey } from "@/lib/ori/methodology";
 import type { ORIResult } from "@/lib/ori/types";
 import { formatNumber } from "@/lib/utils";
-import { Download } from "lucide-react";
+import { ChevronDown, Columns3, Download } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type SortKey =
   | "symbol"
   | "overallScore"
-  | "change24h"
   | "marketCap"
-  | "dataConfidence";
+  | "weightedCoverage"
+  | "structuralScore"
+  | "dynamicScore"
+  | "dataConfidence"
+  | "change24h";
+
+const RISK_GRADES = [
+  "Institutional Grade",
+  "Moderate Risk",
+  "Elevated Risk",
+  "High Risk",
+  "Insufficient Data",
+] as const;
+
+const STRUCTURAL_KEYS = ORI_CATEGORY_KEYS.filter(
+  (key) => ORI_CATEGORY_DIMENSION[key] === "structural"
+);
+const DYNAMIC_KEYS = ORI_CATEGORY_KEYS.filter(
+  (key) => ORI_CATEGORY_DIMENSION[key] === "dynamic"
+);
 
 function num(v: string): number | undefined {
   if (v === "") return undefined;
   const n = Number(v);
   return Number.isFinite(n) ? n : undefined;
+}
+
+function displayScore(value: number | null | undefined): string {
+  return value == null ? "—" : String(Math.round(value));
+}
+
+function displayCoverage(result: ORIResult): string {
+  if (typeof result.weightedCoverage !== "number") return "—";
+  return `${(result.weightedCoverage * 100).toFixed(1)}%`;
+}
+
+function categoryScore(result: ORIResult, key: OriCategoryKey): number | null {
+  return result.categoryScores.find((c) => c.key === key)?.score ?? null;
+}
+
+function sortValue(result: ORIResult, key: SortKey): number | string | null {
+  if (key === "symbol") return result.symbol;
+  if (key === "overallScore") return result.overallScore;
+  if (key === "marketCap") return result.underlyingMetrics.marketCap;
+  if (key === "weightedCoverage") return result.weightedCoverage;
+  if (key === "structuralScore") return result.structuralScore;
+  if (key === "dynamicScore") return result.dynamicScore;
+  if (key === "dataConfidence") return result.dataConfidence.score;
+  return result.change24h;
+}
+
+function RangeField({
+  label,
+  min,
+  max,
+  onMin,
+  onMax,
+}: {
+  label: string;
+  min?: number;
+  max?: number;
+  onMin: (v?: number) => void;
+  onMax: (v?: number) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      <div className="flex items-center gap-1.5">
+        <Input
+          type="number"
+          placeholder="Min"
+          className="h-8 min-w-0 px-2 text-xs"
+          value={min ?? ""}
+          onChange={(e) => onMin(num(e.target.value))}
+        />
+        <span className="shrink-0 text-xs text-muted-foreground">—</span>
+        <Input
+          type="number"
+          placeholder="Max"
+          className="h-8 min-w-0 px-2 text-xs"
+          value={max ?? ""}
+          onChange={(e) => onMax(num(e.target.value))}
+        />
+      </div>
+    </div>
+  );
 }
 
 export function ScreenerClient({ initial }: { initial: ORIResult[] }) {
@@ -36,7 +120,12 @@ export function ScreenerClient({ initial }: { initial: ORIResult[] }) {
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("desc");
   const [screens, setScreens] = React.useState<SavedScreen[]>([]);
   const [screenName, setScreenName] = React.useState("");
+  const [naming, setNaming] = React.useState(false);
   const [loadedScreen, setLoadedScreen] = React.useState<string | null>(null);
+  const [advancedOpen, setAdvancedOpen] = React.useState(false);
+  const [columnsOpen, setColumnsOpen] = React.useState(false);
+  const [extraColumns, setExtraColumns] = React.useState<OriCategoryKey[]>([]);
+  const columnsRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     void fetch("/api/workspace/screens")
@@ -45,20 +134,33 @@ export function ScreenerClient({ initial }: { initial: ORIResult[] }) {
       .catch(() => undefined);
   }, []);
 
+  React.useEffect(() => {
+    const hasCategoryFilters = Object.values(applied.categories ?? {}).some(
+      (range) => range?.min != null || range?.max != null
+    );
+    if (hasCategoryFilters) setAdvancedOpen(true);
+  }, [applied.categories]);
+
+  React.useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (columnsRef.current && !columnsRef.current.contains(e.target as Node)) {
+        setColumnsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
   const rows = React.useMemo(() => {
     const filtered = applyScreenerFilters(initial, applied);
     return [...filtered].sort((a, b) => {
       const dir = sortDir === "asc" ? 1 : -1;
-      if (sortKey === "symbol") return dir * a.symbol.localeCompare(b.symbol);
-      if (sortKey === "dataConfidence") {
-        return dir * a.dataConfidence.score - b.dataConfidence.score;
+      const av = sortValue(a, sortKey);
+      const bv = sortValue(b, sortKey);
+      if (typeof av === "string" || typeof bv === "string") {
+        return dir * String(av ?? "").localeCompare(String(bv ?? ""));
       }
-      if (sortKey === "marketCap") {
-        return dir * ((a.underlyingMetrics.marketCap ?? 0) - (b.underlyingMetrics.marketCap ?? 0));
-      }
-      const av = (a[sortKey] as number | null) ?? -Infinity;
-      const bv = (b[sortKey] as number | null) ?? -Infinity;
-      return dir * (av - bv);
+      return dir * ((av ?? -Infinity) - (bv ?? -Infinity));
     });
   }, [initial, applied, sortKey, sortDir]);
 
@@ -81,6 +183,22 @@ export function ScreenerClient({ initial }: { initial: ORIResult[] }) {
     setDraft({});
     setApplied({});
     setLoadedScreen(null);
+    setNaming(false);
+    setScreenName("");
+  }
+
+  function setCategory(key: OriCategoryKey, patch: CategoryRange) {
+    setDraft((prev) => {
+      const nextRange = { ...prev.categories?.[key], ...patch };
+      const categories = { ...prev.categories, [key]: nextRange };
+      if (nextRange.min == null && nextRange.max == null) {
+        delete categories[key];
+      }
+      return {
+        ...prev,
+        categories: Object.keys(categories).length ? categories : undefined,
+      };
+    });
   }
 
   async function saveScreen() {
@@ -94,6 +212,7 @@ export function ScreenerClient({ initial }: { initial: ORIResult[] }) {
     if (data.screen) {
       setScreens((prev) => [data.screen, ...prev]);
       setScreenName("");
+      setNaming(false);
       trackProductEvent("saved_screen_created", {
         savedScreenId: data.screen.id,
         metadata: { filterCount: describeFilters(applied).length },
@@ -165,30 +284,33 @@ export function ScreenerClient({ initial }: { initial: ORIResult[] }) {
     }
   }
 
+  function toggleColumn(key: OriCategoryKey) {
+    setExtraColumns((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
+  }
+
   return (
-    <div className="space-y-5">
-      <Card>
-        <CardContent className="pt-5 space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <label className="text-xs space-y-1">
-              <span className="text-muted-foreground">ORI min</span>
-              <Input
-                type="number"
-                value={draft.oriMin ?? ""}
-                onChange={(e) => setDraft({ ...draft, oriMin: num(e.target.value) })}
-              />
-            </label>
-            <label className="text-xs space-y-1">
-              <span className="text-muted-foreground">ORI max</span>
-              <Input
-                type="number"
-                value={draft.oriMax ?? ""}
-                onChange={(e) => setDraft({ ...draft, oriMax: num(e.target.value) })}
-              />
-            </label>
-            <label className="text-xs space-y-1">
-              <span className="text-muted-foreground">Data Confidence</span>
+    <div className="space-y-6">
+      <div className="space-y-5">
+        <section className="space-y-3">
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+            Primary Filters
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <RangeField
+              label="ORI Range"
+              min={draft.oriMin}
+              max={draft.oriMax}
+              onMin={(oriMin) => setDraft({ ...draft, oriMin })}
+              onMax={(oriMax) => setDraft({ ...draft, oriMax })}
+            />
+            <label className="space-y-1.5">
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                Confidence
+              </p>
               <Select
+                className="h-8 text-xs"
                 value={draft.confidence?.[0] ?? ""}
                 onChange={(e) =>
                   setDraft({
@@ -205,120 +327,232 @@ export function ScreenerClient({ initial }: { initial: ORIResult[] }) {
                 <option value="Low">Low</option>
               </Select>
             </label>
-            <label className="text-xs space-y-1">
-              <span className="text-muted-foreground">Market cap min</span>
-              <Input
-                type="number"
-                value={draft.marketCapMin ?? ""}
+            <RangeField
+              label="Market Cap"
+              min={draft.marketCapMin}
+              max={draft.marketCapMax}
+              onMin={(marketCapMin) => setDraft({ ...draft, marketCapMin })}
+              onMax={(marketCapMax) => setDraft({ ...draft, marketCapMax })}
+            />
+            <label className="space-y-1.5">
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                Risk Grade
+              </p>
+              <Select
+                className="h-8 text-xs"
+                value={draft.grades?.[0] ?? ""}
                 onChange={(e) =>
-                  setDraft({ ...draft, marketCapMin: num(e.target.value) })
+                  setDraft({
+                    ...draft,
+                    grades: e.target.value ? [e.target.value] : undefined,
+                  })
                 }
-              />
+              >
+                <option value="">Any</option>
+                {RISK_GRADES.map((grade) => (
+                  <option key={grade} value={grade}>
+                    {grade}
+                  </option>
+                ))}
+              </Select>
             </label>
           </div>
+        </section>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {ORI_CATEGORY_KEYS.map((key) => (
-              <div key={key} className="grid grid-cols-2 gap-2">
-                <label className="text-xs space-y-1">
-                  <span className="text-muted-foreground">
-                    {ORI_CATEGORY_LABELS[key]} min
-                  </span>
-                  <Input
-                    type="number"
-                    value={draft.categories?.[key]?.min ?? ""}
-                    onChange={(e) =>
-                      setDraft({
-                        ...draft,
-                        categories: {
-                          ...draft.categories,
-                          [key]: {
-                            ...draft.categories?.[key],
-                            min: num(e.target.value),
-                          },
-                        },
-                      })
-                    }
-                  />
-                </label>
-                <label className="text-xs space-y-1">
-                  <span className="text-muted-foreground">max</span>
-                  <Input
-                    type="number"
-                    value={draft.categories?.[key]?.max ?? ""}
-                    onChange={(e) =>
-                      setDraft({
-                        ...draft,
-                        categories: {
-                          ...draft.categories,
-                          [key]: {
-                            ...draft.categories?.[key],
-                            max: num(e.target.value),
-                          },
-                        },
-                      })
-                    }
-                  />
-                </label>
+        <section className="space-y-3">
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+            Risk Dimensions
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <RangeField
+              label="Structural Risk"
+              min={draft.structuralMin}
+              max={draft.structuralMax}
+              onMin={(structuralMin) => setDraft({ ...draft, structuralMin })}
+              onMax={(structuralMax) => setDraft({ ...draft, structuralMax })}
+            />
+            <RangeField
+              label="Dynamic Risk"
+              min={draft.dynamicMin}
+              max={draft.dynamicMax}
+              onMin={(dynamicMin) => setDraft({ ...draft, dynamicMin })}
+              onMax={(dynamicMax) => setDraft({ ...draft, dynamicMax })}
+            />
+            <div className="space-y-1.5">
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                Min Coverage
+              </p>
+              <Input
+                type="number"
+                placeholder="60"
+                className="h-8 px-2 text-xs"
+                value={draft.coverageMin ?? ""}
+                onChange={(e) => setDraft({ ...draft, coverageMin: num(e.target.value) })}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-muted-foreground hover:text-foreground"
+            onClick={() => setAdvancedOpen((open) => !open)}
+            aria-expanded={advancedOpen}
+          >
+            Advanced Risk Filters
+            <ChevronDown
+              className={cn("h-3.5 w-3.5 transition-transform", advancedOpen && "rotate-180")}
+            />
+          </button>
+          {advancedOpen && (
+            <div className="mt-3 grid gap-6 lg:grid-cols-2">
+              <div className="space-y-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground/80">
+                  Structural Risk
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {STRUCTURAL_KEYS.map((key) => (
+                    <RangeField
+                      key={key}
+                      label={ORI_CATEGORY_LABELS[key]}
+                      min={draft.categories?.[key]?.min}
+                      max={draft.categories?.[key]?.max}
+                      onMin={(min) => setCategory(key, { min })}
+                      onMax={(max) => setCategory(key, { max })}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground/80">
+                  Dynamic Risk
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {DYNAMIC_KEYS.map((key) => (
+                    <RangeField
+                      key={key}
+                      label={ORI_CATEGORY_LABELS[key]}
+                      min={draft.categories?.[key]?.min}
+                      max={draft.categories?.[key]?.max}
+                      onMin={(min) => setCategory(key, { min })}
+                      onMax={(max) => setCategory(key, { max })}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" onClick={apply}>
+            Apply Filters
+          </Button>
+          <Button size="sm" variant="outline" onClick={clear}>
+            Clear
+          </Button>
+          <span className="mx-1 hidden h-4 w-px bg-border sm:block" />
+          {naming ? (
+            <>
+              <Input
+                autoFocus
+                className="h-8 w-48 px-2 text-xs"
+                placeholder="Screen name"
+                value={screenName}
+                onChange={(e) => setScreenName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void saveScreen();
+                  if (e.key === "Escape") {
+                    setNaming(false);
+                    setScreenName("");
+                  }
+                }}
+              />
+              <Button size="sm" variant="secondary" onClick={() => void saveScreen()}>
+                Save
+              </Button>
+            </>
+          ) : (
+            <Button size="sm" variant="secondary" onClick={() => setNaming(true)}>
+              Save Screen
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" onClick={exportCsv} className="gap-1">
+            <Download className="h-3.5 w-3.5" />
+            Export CSV
+          </Button>
+        </div>
+
+        {chips.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {chips.map((chip) => (
+              <Badge key={chip} variant="outline">
+                {chip}
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        {screens.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {screens.map((s) => (
+              <div key={s.id} className="flex items-center gap-1">
+                <Button
+                  size="sm"
+                  variant={loadedScreen === s.id ? "default" : "outline"}
+                  onClick={() => loadScreen(s)}
+                >
+                  {s.name}
+                </Button>
+                <button
+                  type="button"
+                  className="text-[10px] text-muted-foreground hover:text-foreground"
+                  onClick={() => deleteScreen(s.id)}
+                >
+                  ×
+                </button>
               </div>
             ))}
           </div>
+        )}
+      </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" onClick={apply}>
-              Apply
-            </Button>
-            <Button size="sm" variant="outline" onClick={clear}>
-              Clear
-            </Button>
-            <Input
-              className="w-48"
-              placeholder="Save screen as…"
-              value={screenName}
-              onChange={(e) => setScreenName(e.target.value)}
-            />
-            <Button size="sm" variant="secondary" onClick={saveScreen}>
-              Save Screen
-            </Button>
-            <Button size="sm" variant="ghost" onClick={exportCsv} className="gap-1">
-              <Download className="h-3.5 w-3.5" /> CSV
-            </Button>
-          </div>
-
-          {chips.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {chips.map((chip) => (
-                <Badge key={chip} variant="outline">
-                  {chip}
-                </Badge>
-              ))}
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[10px] text-muted-foreground">
+          {rows.length} assets · methodology {initial[0]?.methodologyVersion ?? "1.0"}
+        </p>
+        <div ref={columnsRef} className="relative">
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={() => setColumnsOpen((open) => !open)}
+          >
+            <Columns3 className="h-3.5 w-3.5" />
+            Columns
+          </Button>
+          {columnsOpen && (
+            <div className="absolute right-0 z-20 mt-1 w-64 rounded-md border border-border bg-background p-3 shadow-md">
+              <p className="mb-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                Additional fields
+              </p>
+              <div className="space-y-1.5">
+                {ORI_CATEGORY_KEYS.map((key) => (
+                  <label key={key} className="flex items-center gap-2 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={extraColumns.includes(key)}
+                      onChange={() => toggleColumn(key)}
+                    />
+                    {ORI_CATEGORY_LABELS[key]}
+                  </label>
+                ))}
+              </div>
             </div>
           )}
-
-          {screens.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {screens.map((s) => (
-                <div key={s.id} className="flex items-center gap-1">
-                  <Button
-                    size="sm"
-                    variant={loadedScreen === s.id ? "default" : "outline"}
-                    onClick={() => loadScreen(s)}
-                  >
-                    {s.name}
-                  </Button>
-                  <button
-                    type="button"
-                    className="text-[10px] text-muted-foreground hover:text-foreground"
-                    onClick={() => deleteScreen(s.id)}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <div className="overflow-x-auto rounded-lg border border-border">
         {rows.length === 0 ? (
@@ -345,23 +579,27 @@ export function ScreenerClient({ initial }: { initial: ORIResult[] }) {
                     ORI
                   </button>
                 </th>
-                <th className="px-3 py-2 text-left font-medium">Grade</th>
+                <th className="px-3 py-2 text-left font-medium">Risk</th>
                 <th className="px-3 py-2 text-right font-medium">
-                  <button type="button" onClick={() => toggleSort("change24h")}>
-                    24h
+                  <button type="button" onClick={() => toggleSort("weightedCoverage")}>
+                    Coverage
                   </button>
                 </th>
-                {ORI_CATEGORY_KEYS.map((key) => (
+                <th className="px-3 py-2 text-right font-medium">
+                  <button type="button" onClick={() => toggleSort("structuralScore")}>
+                    Structural
+                  </button>
+                </th>
+                <th className="px-3 py-2 text-right font-medium">
+                  <button type="button" onClick={() => toggleSort("dynamicScore")}>
+                    Dynamic
+                  </button>
+                </th>
+                {extraColumns.map((key) => (
                   <th key={key} className="px-3 py-2 text-right font-medium">
-                    {ORI_CATEGORY_LABELS[key].split(" ")[0]}
+                    {ORI_CATEGORY_LABELS[key]}
                   </th>
                 ))}
-                <th className="px-3 py-2 text-left font-medium">
-                  <button type="button" onClick={() => toggleSort("dataConfidence")}>
-                    Confidence
-                  </button>
-                </th>
-                <th className="px-3 py-2 text-left font-medium">Updated</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
@@ -385,23 +623,21 @@ export function ScreenerClient({ initial }: { initial: ORIResult[] }) {
                       : "—"}
                   </td>
                   <td className="px-3 py-2 text-right font-mono font-medium">
-                    {r.overallScore}
+                    {displayScore(r.overallScore)}
                   </td>
-                  <td className="px-3 py-2">{r.grade}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{r.grade}</td>
+                  <td className="px-3 py-2 text-right font-mono">{displayCoverage(r)}</td>
                   <td className="px-3 py-2 text-right font-mono">
-                    {r.change24h == null
-                      ? "—"
-                      : `${r.change24h > 0 ? "+" : ""}${r.change24h}`}
+                    {displayScore(r.structuralScore)}
                   </td>
-                  {ORI_CATEGORY_KEYS.map((key) => (
+                  <td className="px-3 py-2 text-right font-mono">
+                    {displayScore(r.dynamicScore)}
+                  </td>
+                  {extraColumns.map((key) => (
                     <td key={key} className="px-3 py-2 text-right font-mono">
-                      {r.categoryScores.find((c) => c.key === key)?.score ?? "—"}
+                      {displayScore(categoryScore(r, key))}
                     </td>
                   ))}
-                  <td className="px-3 py-2">{r.dataConfidence.level}</td>
-                  <td className="px-3 py-2 text-muted-foreground">
-                    {new Date(r.lastUpdated).toLocaleDateString()}
-                  </td>
                   <td className="px-3 py-2">
                     <AssetActions symbol={r.symbol} compact />
                   </td>
@@ -411,9 +647,6 @@ export function ScreenerClient({ initial }: { initial: ORIResult[] }) {
           </table>
         )}
       </div>
-      <p className="text-[10px] text-muted-foreground">
-        {rows.length} assets · methodology {initial[0]?.methodologyVersion ?? "ORI_v1.0"}
-      </p>
     </div>
   );
 }

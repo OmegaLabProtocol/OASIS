@@ -62,13 +62,18 @@ function NavLink({
   );
 }
 
-export function SidebarNavigation() {
+export function SidebarNavigation({
+  investorMode = false,
+}: {
+  investorMode?: boolean;
+}) {
   const pathname = usePathname();
+  const homeHref = investorMode ? "/dashboard" : "/";
 
   return (
     <aside className="fixed left-0 top-0 z-40 hidden lg:flex h-screen w-56 flex-col border-r border-border bg-sidebar">
       <div className="flex h-14 items-center gap-2 border-b border-border px-4">
-        <Link href="/" className="flex items-center gap-2">
+        <Link href={homeHref} className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded border border-border bg-muted text-[10px] font-bold tracking-widest">
             Ω
           </div>
@@ -93,11 +98,11 @@ export function SidebarNavigation() {
 
       <div className="border-t border-border p-3">
         <Link
-          href="/"
+          href={homeHref}
           className="flex items-center gap-2 rounded-md px-3 py-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           <Home className="h-3.5 w-3.5" />
-          Landing Page
+          {investorMode ? "Investor Overview" : "Landing Page"}
         </Link>
       </div>
     </aside>

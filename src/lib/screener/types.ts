@@ -17,6 +17,12 @@ export interface ScreenerFilters {
   marketCapMin?: number;
   marketCapMax?: number;
   volumeMin?: number;
+  structuralMin?: number;
+  structuralMax?: number;
+  dynamicMin?: number;
+  dynamicMax?: number;
+  /** Minimum methodology-weighted coverage, 0–100. */
+  coverageMin?: number;
 }
 
 export interface SavedScreen {

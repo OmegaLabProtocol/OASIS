@@ -9,6 +9,7 @@
  */
 import type { OriLookupResult } from "@/lib/data/types";
 import {
+  ORI_CATEGORY_DIMENSION,
   ORI_CATEGORY_KEYS,
   ORI_CATEGORY_LABELS,
   ORI_CATEGORY_WEIGHTS,
@@ -35,8 +36,9 @@ export function buildCategoryScores(lookup: OriLookupResult): ORICategoryScore[]
       key,
       label: ORI_CATEGORY_LABELS[key],
       score,
+      dimension: ORI_CATEGORY_DIMENSION[key],
       weight,
-      weightedContribution: round2(score * weight),
+      weightedContribution: score == null ? 0 : round2(score * weight),
       status: meta?.status ?? "unavailable",
       confidence: meta?.confidence ?? "low",
     };
@@ -56,12 +58,13 @@ export function buildScoreDrivers(
   categories: ORICategoryScore[]
 ): ORIScoreDriver[] {
   return categories
+    .filter((c) => c.score != null)
     .map((c) => {
-      const contribution = round2(c.weight * (c.score - NEUTRAL_MIDPOINT));
+      const contribution = round2(c.weight * ((c.score as number) - NEUTRAL_MIDPOINT));
       return {
         key: c.key,
         label: c.label,
-        score: c.score,
+        score: c.score as number,
         weight: c.weight,
         contribution,
         direction:
@@ -69,6 +72,18 @@ export function buildScoreDrivers(
       };
     })
     .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution));
+}
+
+/** Lowest-scoring available v1.0 category, or null if evidence is insufficient. */
+export function derivePrimaryRiskDriver(
+  categories: ORICategoryScore[]
+): string | null {
+  const available = categories.filter((c) => c.score != null);
+  if (available.length < 2) return null;
+  const weakest = [...available].sort(
+    (a, b) => (a.score as number) - (b.score as number)
+  )[0];
+  return weakest?.label ?? null;
 }
 
 /**
@@ -94,6 +109,10 @@ export function buildDataConfidence(lookup: OriLookupResult): ORIDataConfidence 
     sourceType,
     factors: buildConfidenceFactors(lookup),
     freshnessMinutes: sourceType === "mock" ? 0 : 15,
+    coverage: lookup.confidenceBreakdown?.coverage ?? Math.round((lookup.weightedCoverage ?? 0) * 100),
+    freshness: lookup.confidenceBreakdown?.freshness ?? 0,
+    sourceQuality: lookup.confidenceBreakdown?.sourceQuality ?? 0,
+    sourceAgreement: lookup.confidenceBreakdown?.sourceAgreement ?? 0,
   };
 }
 
@@ -161,8 +180,12 @@ export function fallbackDataConfidence(): ORIDataConfidence {
     level: "Low",
     score: 30,
     sourceType: "mock",
-    factors: ["Live data unavailable — deterministic fallback estimate."],
+    factors: ["Live data unavailable — no Methodology v1.0 score published."],
     freshnessMinutes: 0,
+    coverage: 0,
+    freshness: 0,
+    sourceQuality: 0,
+    sourceAgreement: 0,
   };
 }
 

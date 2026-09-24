@@ -14,12 +14,15 @@ import {
 import { clampScore } from "./utils";
 
 const CATEGORY_KEYS = [
-  "marketLiquidity",
-  "protocolFundamentals",
-  "holderDistribution",
+  "tokenomics",
+  "ownership",
   "governance",
-  "developerActivity",
-  "supplyRisk",
+  "resilience",
+  "institutional",
+  "market",
+  "liquidity",
+  "onChain",
+  "protocol",
 ] as const;
 
 /**
@@ -46,8 +49,8 @@ export function applyIntelligentCategoryScoring(
   for (const key of CATEGORY_KEYS) {
     const prov = provenance[key];
     const formulaScore = rawScores[key];
-    const anchor = personality.categoryAnchors[key];
-    const modifier = personality.categoryModifiers[key];
+    const anchor = personality.categoryAnchors[key] ?? 50;
+    const modifier = personality.categoryModifiers[key] ?? 0;
     const variation = symbolVariation(symbol, key);
     const typeMult = typeWeights[key] ?? 1;
 
@@ -93,7 +96,7 @@ export function calibrateOriScore(
   tier: TierProfile
 ): number {
   const personality = getProtocolPersonality(symbol);
-  const spread = symbolVariation(symbol, "marketLiquidity");
+  const spread = symbolVariation(symbol, "market");
 
   const liveCount = CATEGORY_KEYS.filter((k) => provenance[k] === "live").length;
   const mockCount = CATEGORY_KEYS.filter(

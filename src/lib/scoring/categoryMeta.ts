@@ -6,7 +6,6 @@ import type {
   CategoryFieldProvenance,
   NormalizedTokenData,
   OriCategoryConfidence,
-  OriCategoryMeta,
   OriCategoryMetadata,
   OriCategoryScores,
   OriCategoryStatus,
@@ -22,15 +21,16 @@ import {
   hasSupplyLiveData,
 } from "@/lib/data/mockOriResolver";
 
-const CATEGORY_TO_MOCK_KEY: Partial<
-  Record<keyof OriCategoryScores, MockFallbackUsage["category"]>
-> = {
-  marketLiquidity: "marketLiquidity",
-  holderDistribution: "holderDistribution",
-  protocolFundamentals: "protocolFundamentals",
+const CATEGORY_TO_MOCK_KEY: Partial<Record<keyof OriCategoryScores, string>> = {
+  market: "marketLiquidity",
+  liquidity: "marketLiquidity",
+  tokenomics: "supplyRisk",
+  ownership: "holderDistribution",
+  onChain: "holderDistribution",
+  protocol: "protocolFundamentals",
+  resilience: "developerActivity",
   governance: "governance",
-  developerActivity: "developerActivity",
-  supplyRisk: "supplyRisk",
+  institutional: "marketLiquidity",
 };
 
 function provenanceToStatus(provenance: CategoryProvenance): OriCategoryStatus {
@@ -82,7 +82,8 @@ function resolveCategoryStatus(
   mockUsage: MockFallbackUsage[],
   score: number | null
 ): { status: OriCategoryStatus; source: string; isMock: boolean; mockReason?: string } {
-  const mockEntry = mockUsage.find((m) => m.category === CATEGORY_TO_MOCK_KEY[category]);
+  const mockKey = CATEGORY_TO_MOCK_KEY[category];
+  const mockEntry = mockUsage.find((m) => m.category === mockKey);
 
   if (mockEntry) {
     return {
@@ -98,7 +99,9 @@ function resolveCategoryStatus(
   }
 
   switch (category) {
-    case "marketLiquidity":
+    case "market":
+    case "liquidity":
+    case "institutional":
       if (hasMarketLiveData(data.market)) {
         return { status: "live", source: data.market!.source, isMock: false };
       }
@@ -106,12 +109,13 @@ function resolveCategoryStatus(
         return { status: "partial", source: data.market!.source, isMock: false };
       }
       break;
-    case "protocolFundamentals":
+    case "protocol":
       if (hasProtocolLiveData(data.protocol)) {
         return { status: "live", source: data.protocol!.source, isMock: false };
       }
       break;
-    case "holderDistribution":
+    case "ownership":
+    case "onChain":
       if (hasHolderLiveData(data.holders)) {
         return { status: "live", source: data.holders!.source, isMock: false };
       }
@@ -124,15 +128,18 @@ function resolveCategoryStatus(
         return { status: "live", source: src, isMock: false };
       }
       break;
-    case "developerActivity":
+    case "resilience":
       if (hasDeveloperLiveData(data.developer)) {
         return { status: "live", source: data.developer!.source, isMock: false };
+      }
+      if (hasProtocolLiveData(data.protocol)) {
+        return { status: "live", source: data.protocol!.source, isMock: false };
       }
       if (hasPartialDeveloperData(data.developer)) {
         return { status: "partial", source: data.developer!.source, isMock: false };
       }
       break;
-    case "supplyRisk":
+    case "tokenomics":
       if (hasSupplyLiveData(data.market)) {
         return { status: "live", source: data.market!.source, isMock: false };
       }

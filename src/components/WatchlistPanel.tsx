@@ -7,14 +7,13 @@ import { OriChange24h } from "@/components/OriChange24h";
 import { RiskBadge } from "@/components/RiskBadge";
 import { useWatchlist } from "@/components/providers/watchlist-provider";
 import { useORI } from "@/hooks/useOri";
-import { get7dChange, getPrimaryRiskDriver } from "@/data/tokens";
+import { derivePrimaryRiskDriver } from "@/lib/ori/enrich";
 import { resolveToken } from "@/lib/ori/tokenMap";
 import {
   ORI_REFRESH_INTERVAL_MS,
   ORI_DEDUPE_INTERVAL_MS,
 } from "@/services/ori/cache";
 import type { RiskLabel } from "@/lib/types";
-import { formatPercent } from "@/lib/utils";
 import type { ORIResult } from "@/lib/ori/types";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -81,7 +80,7 @@ function WatchlistRow({
       <Link href={`/tokens/${symbol}`} className="flex-1">
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium w-10">{symbol}</span>
-          <span className="font-mono text-sm">{result.currentScore}</span>
+          <span className="font-mono text-sm">{result.currentScore ?? "—"}</span>
           <RiskBadge
             label={result.grade as RiskLabel}
             score={result.currentScore}
@@ -89,10 +88,16 @@ function WatchlistRow({
           />
         </div>
         <div className="mt-1 flex gap-3 text-[10px] text-muted-foreground">
-          <OriChange24h change={result.percentChange ?? 0} decimals={1} />
-          <span>7d {formatPercent(get7dChange(symbol))}</span>
+          {result.percentChange == null ? (
+            <span>—</span>
+          ) : (
+            <OriChange24h change={result.percentChange} decimals={1} />
+          )}
+          <span>7d —</span>
           <span className="truncate max-w-[120px]">
-            {getPrimaryRiskDriver(symbol)}
+            {result.publicationStatus === "published"
+              ? derivePrimaryRiskDriver(result.categoryScores) ?? "—"
+              : "—"}
           </span>
         </div>
       </Link>

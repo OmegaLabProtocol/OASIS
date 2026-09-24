@@ -7,11 +7,16 @@ export function RiskBadge({
   score,
   className,
 }: {
-  label: RiskLabel;
-  score?: number;
+  label: RiskLabel | "Insufficient Data";
+  score?: number | null;
   className?: string;
 }) {
-  const tier = score != null ? getOriTier(score) : getOriTierByLabel(label);
+  const tier =
+    score != null
+      ? getOriTier(score)
+      : label === "Insufficient Data"
+        ? getOriTier(0)
+        : getOriTierByLabel(label);
 
   return (
     <span

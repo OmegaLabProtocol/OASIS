@@ -22,6 +22,8 @@ import { OriCategoryBreakdown } from "@/components/OriCategoryBreakdown";
 import { AssetProfileCard } from "@/components/AssetProfileCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { COMPONENT_LABELS } from "@/lib/scoring";
+import { ORI_CATEGORY_LABELS } from "@/lib/ori/methodology";
+import type { OriCategoryScores } from "@/lib/data/types";
 import type { OriComponentScores } from "@/lib/types";
 import { formatNumber } from "@/lib/utils";
 import { getLiveTokenDetail } from "@/services/dataService";
@@ -132,16 +134,22 @@ export default async function TokenPage({
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground">
-              ORI Component Breakdown
+              Structural & Dynamic Breakdown
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ScoreBreakdownChart components={components} />
+            {oriResult ? (
+              <ScoreBreakdownChart categoryScores={oriResult.categoryScores} />
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Category scores unavailable until Methodology v1.0 evidence is published.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {metrics.previousOriScore && metrics.riskChangeReasons && (
+      {metrics.oriScore != null && metrics.previousOriScore != null && metrics.riskChangeReasons && (
         <RiskChangeExplanation
           symbol={metrics.symbol}
           previousScore={metrics.previousOriScore}
@@ -158,6 +166,11 @@ export default async function TokenPage({
           categoryScores={oriResult.categoryScores}
           categoryMetadata={oriResult.categoryMetadata}
           confidenceScore={oriResult.confidenceScore}
+          structuralScore={oriResult.structuralScore}
+          dynamicScore={oriResult.dynamicScore}
+          baseOri={oriResult.baseOri}
+          eventAdjustment={oriResult.eventAdjustment}
+          finalOri={oriResult.oriScore}
         />
       )}
 
@@ -168,26 +181,26 @@ export default async function TokenPage({
       <AIInsightCard summary={commentary.summary} />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <OriHistoryPanel symbol={metrics.symbol} fallback={history.ori} />
+        <OriHistoryPanel symbol={metrics.symbol} />
         <TokenOriHistoryChart
           symbol={metrics.symbol}
           initial={oriResultNormalized}
-          fallbackData={history.ori}
-          title="Session ORI path"
+          fallbackData={[]}
+          title="Observed ORI history"
         />
         <HistoricalChart
           data={history.liquidity}
-          title="Liquidity Stability"
+          title="Liquidity Risk (Simulated Data)"
           color="#71717a"
         />
         <HistoricalChart
           data={history.marketIntegrity}
-          title="Market Integrity"
+          title="Market Risk (Simulated Data)"
           color="#a1a1aa"
         />
         <HistoricalChart
           data={history.smartMoney}
-          title="Smart Money Positioning"
+          title="On-Chain Risk (Simulated Data)"
           color="#52525b"
         />
       </div>
@@ -200,16 +213,29 @@ export default async function TokenPage({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {(Object.keys(components) as (keyof OriComponentScores)[]).map(
-              (key) => (
-                <div key={key} className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">
-                    {COMPONENT_LABELS[key]}
-                  </span>
-                  <span className="font-mono">{components[key]}</span>
-                </div>
-              )
-            )}
+            {oriResult
+              ? (Object.keys(oriResult.categoryScores) as (keyof OriCategoryScores)[]).map(
+                  (key) => (
+                    <div key={key} className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">
+                        {ORI_CATEGORY_LABELS[key]}
+                      </span>
+                      <span className="font-mono">
+                        {oriResult.categoryScores[key] ?? "—"}
+                      </span>
+                    </div>
+                  )
+                )
+              : (Object.keys(components) as (keyof OriComponentScores)[]).map(
+                  (key) => (
+                    <div key={key} className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">
+                        {COMPONENT_LABELS[key]}
+                      </span>
+                      <span className="font-mono">{components[key]}</span>
+                    </div>
+                  )
+                )}
           </CardContent>
         </Card>
 

@@ -10,84 +10,96 @@ export interface CategoryFieldProvenance {
 }
 
 const CATEGORY_KEYS = [
-  "marketLiquidity",
-  "protocolFundamentals",
-  "holderDistribution",
+  "tokenomics",
+  "ownership",
   "governance",
-  "developerActivity",
-  "supplyRisk",
-] as const;
+  "resilience",
+  "institutional",
+  "market",
+  "liquidity",
+  "onChain",
+  "protocol",
+] as const satisfies readonly (keyof OriCategoryScores)[];
 
 function isLiveSource(source?: string | null): boolean {
   if (!source) return false;
   return source !== MOCK_FALLBACK_SOURCE && !source.toLowerCase().includes("mock");
 }
 
-export function detectCategoryProvenance(
-  raw: NormalizedTokenData,
-  enriched: NormalizedTokenData
-): Record<keyof OriCategoryScores, CategoryProvenance> {
-  const result = {} as Record<keyof OriCategoryScores, CategoryProvenance>;
-
-  // Market liquidity — live if CoinGecko core fields present
+function marketStatus(raw: NormalizedTokenData, enriched: NormalizedTokenData): CategoryProvenance {
   const marketLive =
     isLiveSource(raw.market?.source) &&
     raw.market?.price != null &&
     raw.market?.marketCap != null &&
     raw.market?.volume24h != null;
-
   const marketPartial =
     !marketLive &&
     isLiveSource(raw.market?.source) &&
-    [raw.market?.price, raw.market?.marketCap, raw.market?.volume24h].some(
-      (v) => v != null
-    );
+    [raw.market?.price, raw.market?.marketCap, raw.market?.volume24h].some((v) => v != null);
+  if (marketLive) return "live";
+  if (marketPartial) return "partial";
+  if (isLiveSource(enriched.market?.source)) return "live";
+  if (enriched.market) return "mock";
+  return "unavailable";
+}
 
-  result.marketLiquidity = marketLive
-    ? "live"
-    : marketPartial
-      ? "partial"
-      : isLiveSource(enriched.market?.source)
-        ? "live"
-        : enriched.market
-          ? "mock"
-          : "unavailable";
+export function detectCategoryProvenance(
+  raw: NormalizedTokenData,
+  enriched: NormalizedTokenData
+): Record<keyof OriCategoryScores, CategoryProvenance> {
+  const market = marketStatus(raw, enriched);
 
-  // Supply — can be partial when market is live but supply fields filled.
-  // CryptoRank is a live supplemental source for supply / unlock signal.
   const cryptoRankSupplyLive =
     isLiveSource(raw.cryptorank?.source) &&
     (raw.cryptorank?.circulatingSupply != null ||
       raw.cryptorank?.lockedSupplyPercent != null ||
       raw.cryptorank?.nextUnlockPercentOfSupply != null);
-
   const supplyLive =
     (isLiveSource(raw.market?.source) &&
       raw.market?.circulatingSupply != null &&
       raw.market?.totalSupply != null) ||
     cryptoRankSupplyLive;
-
   const supplyPartial =
     !supplyLive &&
     isLiveSource(enriched.market?.source) &&
     enriched.market?.circulatingSupply != null;
-
-  result.supplyRisk = supplyLive
+  const tokenomics: CategoryProvenance = supplyLive
     ? "live"
     : supplyPartial
       ? "estimated"
-      : result.marketLiquidity === "live"
+      : market === "live"
         ? "estimated"
-        : result.marketLiquidity === "mock"
+        : market === "mock"
           ? "mock"
           : "unavailable";
 
-  // Protocol
+  const holdersLive =
+    isLiveSource(raw.holders?.source) &&
+    (raw.holders?.holderCount != null || raw.holders?.top10HolderPercent != null);
+  const ownership: CategoryProvenance = holdersLive
+    ? "live"
+    : enriched.holders && !isLiveSource(enriched.holders.source)
+      ? "mock"
+      : enriched.holders
+        ? "estimated"
+        : "unavailable";
+
+  const govRaw = raw.governance?.meta?.available ? raw.governance : raw.tally;
+  const govLive =
+    isLiveSource(govRaw?.source) &&
+    (govRaw?.proposalCount != null || govRaw?.recentProposalCount90d != null);
+  const governance: CategoryProvenance = govLive
+    ? "live"
+    : enriched.governance && !isLiveSource(enriched.governance.source)
+      ? "mock"
+      : enriched.governance
+        ? "estimated"
+        : "unavailable";
+
   const protocolLive =
     isLiveSource(raw.protocol?.source) &&
     (raw.protocol?.tvl != null || raw.protocol?.revenue30d != null);
-
-  result.protocolFundamentals = protocolLive
+  const protocol: CategoryProvenance = protocolLive
     ? "live"
     : isLiveSource(raw.protocol?.source)
       ? "partial"
@@ -97,47 +109,17 @@ export function detectCategoryProvenance(
           ? "mock"
           : "unavailable";
 
-  // Holders
-  const holdersLive =
-    isLiveSource(raw.holders?.source) &&
-    (raw.holders?.holderCount != null || raw.holders?.top10HolderPercent != null);
-
-  result.holderDistribution = holdersLive
-    ? "live"
-    : enriched.holders && !isLiveSource(enriched.holders.source)
-      ? "mock"
-      : enriched.holders
-        ? "estimated"
-        : "unavailable";
-
-  // Governance
-  const govRaw = raw.governance?.meta?.available ? raw.governance : raw.tally;
-  const govLive =
-    isLiveSource(govRaw?.source) &&
-    (govRaw?.proposalCount != null || govRaw?.recentProposalCount90d != null);
-
-  result.governance = govLive
-    ? "live"
-    : enriched.governance && !isLiveSource(enriched.governance.source)
-      ? "mock"
-      : enriched.governance
-        ? "estimated"
-        : "unavailable";
-
-  // Developer — full live requires commit cadence, not just repo metadata
   const devLive =
     isLiveSource(raw.developer?.source) &&
     raw.developer?.commits90d != null &&
     (raw.developer?.contributors != null || raw.developer?.stars != null);
-
   const devPartial =
     !devLive &&
     isLiveSource(raw.developer?.source) &&
     (raw.developer?.contributors != null ||
       raw.developer?.stars != null ||
       raw.developer?.lastCommitDate != null);
-
-  result.developerActivity = devLive
+  const developer: CategoryProvenance = devLive
     ? "live"
     : devPartial
       ? "partial"
@@ -147,7 +129,33 @@ export function detectCategoryProvenance(
           ? "estimated"
           : "unavailable";
 
-  return result;
+  const resilience: CategoryProvenance =
+    protocol === "live" || developer === "live"
+      ? "live"
+      : protocol === "partial" || developer === "partial"
+        ? "partial"
+        : protocol === "mock" || developer === "mock"
+          ? "mock"
+          : developer === "estimated"
+            ? "estimated"
+            : "unavailable";
+
+  const institutional: CategoryProvenance =
+    isLiveSource(raw.cryptorank?.source) && raw.cryptorank?.investorsCount != null
+      ? "live"
+      : market;
+
+  return {
+    tokenomics,
+    ownership,
+    governance,
+    resilience,
+    institutional,
+    market,
+    liquidity: market,
+    onChain: ownership,
+    protocol,
+  };
 }
 
 export function buildFieldProvenance(
@@ -166,21 +174,25 @@ export function buildFieldProvenance(
   };
 
   switch (category) {
-    case "marketLiquidity":
+    case "market":
+    case "liquidity":
       track("price", raw.market?.price, enriched.market?.price);
       track("marketCap", raw.market?.marketCap, enriched.market?.marketCap);
       track("volume24h", raw.market?.volume24h, enriched.market?.volume24h);
       break;
-    case "supplyRisk":
+    case "tokenomics":
       track("circulatingSupply", raw.market?.circulatingSupply, enriched.market?.circulatingSupply);
       track("totalSupply", raw.market?.totalSupply, enriched.market?.totalSupply);
       track("fdv", raw.market?.fdv, enriched.market?.fdv);
       break;
-    case "protocolFundamentals":
+    case "protocol":
+    case "resilience":
       track("tvl", raw.protocol?.tvl, enriched.protocol?.tvl);
       track("revenue30d", raw.protocol?.revenue30d, enriched.protocol?.revenue30d);
+      track("commits90d", raw.developer?.commits90d, enriched.developer?.commits90d);
       break;
-    case "holderDistribution":
+    case "ownership":
+    case "onChain":
       track("holderCount", raw.holders?.holderCount, enriched.holders?.holderCount);
       track("top10HolderPercent", raw.holders?.top10HolderPercent, enriched.holders?.top10HolderPercent);
       break;
@@ -188,9 +200,9 @@ export function buildFieldProvenance(
       track("proposalCount", raw.governance?.proposalCount, enriched.governance?.proposalCount);
       track("recentProposalCount90d", raw.governance?.recentProposalCount90d, enriched.governance?.recentProposalCount90d);
       break;
-    case "developerActivity":
-      track("commits90d", raw.developer?.commits90d, enriched.developer?.commits90d);
-      track("contributors", raw.developer?.contributors, enriched.developer?.contributors);
+    case "institutional":
+      track("marketCap", raw.market?.marketCap, enriched.market?.marketCap);
+      track("investorsCount", raw.cryptorank?.investorsCount, enriched.cryptorank?.investorsCount);
       break;
   }
 

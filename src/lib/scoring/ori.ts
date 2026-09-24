@@ -1,36 +1,16 @@
 import type { RiskLabel } from "@/lib/types";
 import type {
   NormalizedTokenData,
+  OriCategoryMetadata,
   OriCategoryScores,
   OriLookupResult,
   OriSourceRecord,
   TokenRegistryEntry,
 } from "@/lib/data/types";
-import type { CategoryProvenance } from "@/lib/data/categoryProvenance";
-import { buildFieldProvenance } from "@/lib/data/categoryProvenance";
-import { buildMockDataDisclaimer } from "@/lib/data/mockOriFallbacks";
-import type { MockFallbackUsage } from "@/lib/data/mockOriResolver";
-import { extractAssetContext, resolveAssetTier } from "@/lib/data/mockOriTiers";
 import { classifyOriRisk } from "@/lib/scoring";
-import {
-  buildCategoryMetadata,
-  calculateConfidenceFromMetadata,
-} from "./categoryMeta";
-import { calculateConfidenceScore } from "./confidenceScore";
-import { scoreDeveloperActivity } from "./developerScore";
-import { scoreProtocolFundamentals } from "./fundamentalsScore";
-import { scoreGovernance } from "./governanceScore";
-import { scoreHolderDistribution } from "./holderRiskScore";
-import { scoreMarketLiquidity } from "./liquidityScore";
-import {
-  applyCalibratedScoresToMetadata,
-  applyMockCategoryScoring,
-  calibrateOriScore,
-} from "./mockOriCalibration";
-import { scoreSupplyRisk } from "./supplyRiskScore";
-import { clampScore, weightedAverage } from "./utils";
-
-import { ORI_CATEGORY_WEIGHTS } from "@/lib/ori/methodology";
+import { computeOriV1 } from "@/lib/ori/v1/compute";
+import { ORI_CATEGORY_LABELS } from "@/lib/ori/methodology";
+import type { OriCategoryKey } from "@/lib/ori/methodology";
 
 export {
   ORI_CATEGORY_WEIGHTS,
@@ -40,43 +20,52 @@ export {
 } from "@/lib/ori/methodology";
 
 export interface OriComputeContext {
-  mockUsage?: MockFallbackUsage[];
+  mockUsage?: unknown[];
   mockCategories?: string[];
   missingLiveDataFields?: string[];
-  categoryProvenance?: Record<keyof OriCategoryScores, CategoryProvenance>;
   rawData?: NormalizedTokenData;
 }
 
 function buildSources(data: NormalizedTokenData): OriSourceRecord[] {
   const records: OriSourceRecord[] = [];
-
   const add = (
     name: string,
     usedFor: string[],
     payload: { lastUpdated: string; meta?: { available: boolean }; source?: string } | null
   ) => {
-    const isMockSource = payload?.source === "Mock fallback model";
     records.push({
       name,
       usedFor,
       lastUpdated: payload?.lastUpdated ?? new Date().toISOString(),
-      available: (payload?.meta?.available ?? false) && !isMockSource,
+      available: payload?.meta?.available ?? Boolean(payload),
     });
   };
-
   add("CoinGecko", ["price", "market cap", "volume", "supply", "FDV"], data.market);
   add("DeFiLlama", ["TVL", "revenue", "fees", "protocol fundamentals"], data.protocol);
   add(
     "CryptoRank",
-    ["token unlocks", "supply schedule", "dilution", "funding history", "investor exposure", "market maturity"],
+    ["token unlocks", "supply schedule", "dilution", "funding", "investors"],
     data.cryptorank ?? null
   );
-  add("Chain Explorer", ["holders", "concentration", "contract verification"], data.holders);
-  add("Snapshot", ["governance proposals", "voting activity"], data.governance);
-  add("Tally", ["DAO governance", "delegation"], data.tally);
-  add("GitHub", ["developer activity", "commits", "contributors"], data.developer);
-
+  add("Chain Explorer", ["holders", "concentration"], data.holders);
+  add("Snapshot", ["governance proposals"], data.governance);
+  add("Tally", ["DAO governance"], data.tally);
+  add("GitHub", ["developer activity"], data.developer);
   return records;
+}
+
+function emptyScores(): OriCategoryScores {
+  return {
+    tokenomics: null,
+    ownership: null,
+    governance: null,
+    resilience: null,
+    institutional: null,
+    market: null,
+    liquidity: null,
+    onChain: null,
+    protocol: null,
+  };
 }
 
 export function computeOriFromNormalizedData(
@@ -86,136 +75,101 @@ export function computeOriFromNormalizedData(
   data: NormalizedTokenData,
   context: OriComputeContext = {}
 ): OriLookupResult {
-  const mockUsage = context.mockUsage ?? [];
-  const mockCategories = context.mockCategories ?? [];
-  const missingLiveDataFields = context.missingLiveDataFields ?? [];
-  const rawData = context.rawData ?? data;
-  const tier = resolveAssetTier(extractAssetContext(entry.symbol, data));
+  const computation = computeOriV1(data, entry.symbol);
+  const categoryScores = emptyScores();
+  const explanation = {} as Record<OriCategoryKey, string>;
+  const categoryMetadata = {} as OriCategoryMetadata;
 
-  const categoryProvenance =
-    context.categoryProvenance ??
-    ({} as Record<keyof OriCategoryScores, CategoryProvenance>);
-
-  const marketResult = scoreMarketLiquidity(data.market);
-  const fundamentalsResult = scoreProtocolFundamentals(data.protocol, data.market);
-  const holderResult = scoreHolderDistribution(data.holders);
-  const governanceResult = scoreGovernance(data.governance, data.tally);
-  const developerResult = scoreDeveloperActivity(data.developer);
-  const supplyResult = scoreSupplyRisk(data.market, data.cryptorank);
-
-  const rawScores: Record<keyof OriCategoryScores, number | null> = {
-    marketLiquidity: marketResult.score,
-    protocolFundamentals: fundamentalsResult.score,
-    holderDistribution: holderResult.score,
-    governance: governanceResult.score,
-    developerActivity: developerResult.score,
-    supplyRisk: supplyResult.score,
-  };
-
-  const calibratedScores = applyMockCategoryScoring(
-    entry.symbol,
-    rawScores,
-    categoryProvenance,
-    mockUsage,
-    tier
-  );
-
-  const fieldProvenance = {} as Record<
-    keyof OriCategoryScores,
-    ReturnType<typeof buildFieldProvenance>
-  >;
-  for (const key of Object.keys(calibratedScores) as (keyof OriCategoryScores)[]) {
-    fieldProvenance[key] = buildFieldProvenance(rawData, data, key);
+  for (const category of computation.categories) {
+    categoryScores[category.key] = category.score;
+    const available = category.metrics.filter((m) => m.availability === "AVAILABLE");
+    const unavailable = category.metrics.filter(
+      (m) => m.availability === "UNAVAILABLE" && !m.future
+    );
+    explanation[category.key] =
+      category.score == null
+        ? `${ORI_CATEGORY_LABELS[category.key]} has no available applicable evidence.`
+        : `${ORI_CATEGORY_LABELS[category.key]} from ${available.length} available metric(s); ${unavailable.length} unavailable.`;
+    categoryMetadata[category.key] = {
+      score: category.score,
+      status:
+        category.score == null
+          ? "unavailable"
+          : unavailable.length === 0
+            ? "live"
+            : "partial",
+      source: available[0]?.source ?? "unavailable",
+      isMock: false,
+      lastUpdated: computation.computedAt,
+      confidence:
+        category.coverage >= 0.8 ? "high" : category.coverage >= 0.4 ? "medium" : "low",
+    };
   }
-
-  // Surface CryptoRank-sourced supply/unlock signal as live provenance fields.
-  const cryptoRankFieldsUsed = supplyResult.cryptoRankFieldsUsed.map(
-    (f) => `${f} (CryptoRank)`
-  );
-  if (cryptoRankFieldsUsed.length > 0) {
-    const existing = fieldProvenance.supplyRisk.liveFields;
-    fieldProvenance.supplyRisk.liveFields = [
-      ...new Set([...existing, ...cryptoRankFieldsUsed]),
-    ];
-  }
-
-  let categoryMetadata = buildCategoryMetadata(
-    data,
-    calibratedScores,
-    { ...rawScores, ...calibratedScores },
-    mockUsage,
-    categoryProvenance,
-    fieldProvenance
-  );
-
-  categoryMetadata = applyCalibratedScoresToMetadata(categoryMetadata, calibratedScores);
-
-  const categoryScores: OriCategoryScores = { ...calibratedScores };
-
-  const rawOri =
-    weightedAverage([
-      { score: categoryScores.marketLiquidity, weight: ORI_CATEGORY_WEIGHTS.marketLiquidity },
-      { score: categoryScores.protocolFundamentals, weight: ORI_CATEGORY_WEIGHTS.protocolFundamentals },
-      { score: categoryScores.holderDistribution, weight: ORI_CATEGORY_WEIGHTS.holderDistribution },
-      { score: categoryScores.governance, weight: ORI_CATEGORY_WEIGHTS.governance },
-      { score: categoryScores.developerActivity, weight: ORI_CATEGORY_WEIGHTS.developerActivity },
-      { score: categoryScores.supplyRisk, weight: ORI_CATEGORY_WEIGHTS.supplyRisk },
-    ]) ?? 0;
-
-  const oriScore = calibrateOriScore(
-    rawOri,
-    entry.symbol,
-    categoryProvenance,
-    tier
-  );
-
-  const { confidenceScore, confidence } = calculateConfidenceFromMetadata(categoryMetadata);
-  const legacyConfidence = calculateConfidenceScore(data);
 
   const liveSourceCount = buildSources(data).filter((s) => s.available).length;
-  const mockDataUsed = mockCategories.length > 0;
+  const dataMode: OriLookupResult["dataMode"] =
+    liveSourceCount >= 3 ? "live" : liveSourceCount >= 1 ? "partial" : "mock";
 
-  let dataMode: OriLookupResult["dataMode"] = "mock";
-  if (!mockDataUsed && liveSourceCount >= 3) dataMode = "live";
-  else if (!mockDataUsed && liveSourceCount >= 1) dataMode = "partial";
-  else if (mockDataUsed && liveSourceCount >= 1) dataMode = "partial";
+  const confidenceBand =
+    computation.confidence.overall >= 75
+      ? "High"
+      : computation.confidence.overall >= 50
+        ? "Medium"
+        : "Low";
 
   return {
     token: entry.name,
     chain,
     address,
     symbol: entry.symbol,
-    oriScore: clampScore(oriScore),
-    confidence,
-    confidenceScore: mockDataUsed
-      ? Math.min(confidenceScore, Math.max(legacyConfidence.confidenceScore, 40))
-      : confidenceScore,
+    oriScore: computation.finalOri,
+    confidence: confidenceBand,
+    confidenceScore: computation.confidence.overall,
     categoryScores,
     categoryMetadata,
     sources: buildSources(data),
-    missingFields: legacyConfidence.missingFields,
-    missingLiveDataFields,
-    explanation: {
-      marketLiquidity: marketResult.explanation,
-      protocolFundamentals: fundamentalsResult.explanation,
-      holderDistribution: holderResult.explanation,
-      governance: governanceResult.explanation,
-      developerActivity: developerResult.explanation,
-      supplyRisk: supplyResult.explanation,
-    },
+    missingFields: computation.metrics
+      .filter((m) => m.availability === "UNAVAILABLE" && !m.future)
+      .map((m) => m.metricId),
+    missingLiveDataFields: context.missingLiveDataFields ?? [],
+    explanation,
     market: data.market,
     protocol: data.protocol,
     holders: data.holders,
     governance: data.governance,
     developer: data.developer,
-    computedAt: new Date().toISOString(),
+    computedAt: computation.computedAt,
     dataMode,
-    mockDataUsed,
-    mockCategories,
-    mockDataDisclaimer: buildMockDataDisclaimer(mockCategories),
-    categoryProvenance: categoryProvenance as Record<keyof OriCategoryScores, string>,
-    fieldProvenance,
-    cryptoRankFieldsUsed,
+    mockDataUsed: false,
+    mockCategories: [],
+    mockDataDisclaimer: "",
+    cryptoRankFieldsUsed: computation.metrics
+      .filter((m) => m.source === "CryptoRank" && m.availability === "AVAILABLE")
+      .map((m) => m.metricId),
+    publicationStatus: computation.publicationStatus,
+    structuralScore: computation.structuralScore,
+    dynamicScore: computation.dynamicScore,
+    baseOri: computation.baseOri,
+    eventAdjustment: computation.eventAdjustment,
+    weightedCoverage: computation.weightedCoverage,
+    confidenceBreakdown: computation.confidence,
+    evidence: computation.metrics.map((m) => ({
+      metricId: m.metricId,
+      category: m.category,
+      structuralOrDynamic: m.structuralOrDynamic,
+      weight: m.weight,
+      applicability: m.applicability,
+      normalization: m.normalization,
+      directionality: m.directionality,
+      evidenceMode: m.evidenceMode,
+      sourceTier: m.sourceTier,
+      source: m.source,
+      observedAt: m.observedAt,
+      rawValue: m.rawValue,
+      normalizedScore: m.normalizedScore,
+      availability: m.availability,
+      future: m.future,
+    })),
   };
 }
 
@@ -223,18 +177,15 @@ export function mapOriScoreToRiskLabel(score: number): RiskLabel {
   return classifyOriRisk(score);
 }
 
-export function mapCategoryScoresToLegacyComponents(
-  categories: OriCategoryScores
-) {
+export function mapCategoryScoresToLegacyComponents(categories: OriCategoryScores) {
   return {
-    liquidityStability: categories.marketLiquidity,
-    marketIntegrity: Math.round(
-      (categories.marketLiquidity + categories.supplyRisk) / 2
-    ),
-    smartMoneyPositioning: categories.developerActivity,
-    volatilityRisk: categories.supplyRisk,
-    holderConcentration: categories.holderDistribution,
-    socialSentimentDivergence: categories.governance,
-    protocolExposureRisk: categories.protocolFundamentals,
+    liquidityStability: categories.liquidity ?? 0,
+    marketIntegrity: categories.market ?? 0,
+    smartMoneyPositioning: categories.onChain ?? 0,
+    volatilityRisk: categories.market ?? 0,
+    holderConcentration: categories.ownership ?? 0,
+    socialSentimentDivergence: categories.governance ?? 0,
+    protocolExposureRisk: categories.protocol ?? categories.resilience ?? 0,
   };
 }
+

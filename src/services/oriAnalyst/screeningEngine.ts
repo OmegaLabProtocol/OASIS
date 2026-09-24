@@ -38,10 +38,10 @@ export async function runScreening(
   let rows = [...all];
 
   if (criteria.minOri != null) {
-    rows = rows.filter((r) => r.ori >= criteria.minOri!);
+    rows = rows.filter((r) => r.ori != null && r.ori >= criteria.minOri!);
   }
   if (criteria.maxOri != null) {
-    rows = rows.filter((r) => r.ori <= criteria.maxOri!);
+    rows = rows.filter((r) => r.ori != null && r.ori <= criteria.maxOri!);
   }
   if (criteria.category) {
     rows = rows.filter(

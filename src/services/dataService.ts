@@ -5,11 +5,8 @@ import { MOCK_PROTOCOLS, type ProtocolEntry } from "@/data/protocols";
 import { MOCK_WALLETS } from "@/data/wallets";
 import {
   TOKEN_RAW_METRICS,
-  PREVIOUS_ORI_SCORES,
-  RISK_CHANGE_ATTRIBUTION,
   TOKEN_COMMENTARY,
   RISK_BRIEF_DATA,
-  get7dChange,
 } from "@/data/tokens";
 import { buildConfidence, buildConfidenceFromOri } from "@/lib/dataConfidence";
 import {
@@ -34,23 +31,11 @@ import { buildFallbackResult } from "@/lib/ori/fallback";
 import { ORI_METHODOLOGY_VERSION } from "@/lib/ori/methodology";
 import {
   EMPTY_UNDERLYING_METRICS,
+  derivePrimaryRiskDriver,
   fallbackDataConfidence,
 } from "@/lib/ori/enrich";
 import { resolveToken } from "@/lib/ori/tokenMap";
-import {
-  historyToPoints,
-  buildSeries,
-  buildHistory,
-  previousScoreFromHistory,
-} from "@/lib/ori/history";
-import {
-  getColor,
-  getGrade,
-  getORIChange,
-  getORINote,
-  getRiskTier,
-  roundScore,
-} from "@/lib/ori/grade";
+import { historyToPoints, buildSeries } from "@/lib/ori/history";
 import type { ORIResult } from "@/lib/ori/types";
 import type {
   DataSourceType,
@@ -175,17 +160,19 @@ function metricsFromResult(
   raw: TokenRawMetrics,
   components: OriComponentScores
 ): OriMetrics {
-  const drivers = RISK_CHANGE_ATTRIBUTION[result.symbol] ?? ["Volatility spike"];
   return {
     symbol: raw.symbol,
     name: raw.name,
     oriScore: result.currentScore,
     riskLabel: result.grade as RiskLabel,
-    change24h: result.percentChange ?? 0,
-    change7d: get7dChange(result.symbol),
-    topRiskDriver: drivers[0],
-    previousOriScore: result.previousScore ?? result.currentScore,
-    riskChangeReasons: drivers,
+    change24h: result.percentChange,
+    change7d: result.change7d,
+    topRiskDriver:
+      result.publicationStatus === "published"
+        ? derivePrimaryRiskDriver(result.categoryScores)
+        : null,
+    previousOriScore: result.previousScore ?? undefined,
+    riskChangeReasons: undefined,
     ...components,
   };
 }
@@ -210,33 +197,32 @@ function resolveResultAndComponents(
   };
 }
 
-/** Last-resort ORIResult when a token isn't in the registry (kept deterministic). */
+/** Last-resort ORIResult when a token isn't in the registry. Does not fabricate ORI. */
 function deriveFromRaw(symbol: string, raw: TokenRawMetrics): ORIResult {
-  const { oriScore } = computeOriFromRaw(raw);
-  const current = roundScore(oriScore);
-  const baselineAnchor = PREVIOUS_ORI_SCORES[symbol] ?? current;
-  const history = buildHistory(symbol, current, baselineAnchor);
-  const previous = previousScoreFromHistory(history);
-  const { absoluteChange, percentChange } = getORIChange(current, previous);
-  const grade = getGrade(current);
   const tokenId = symbol.toUpperCase();
   return {
     tokenId,
     assetId: tokenId,
     symbol: raw.symbol,
     name: raw.name,
-    currentScore: current,
-    overallScore: current,
-    previousScore: previous,
-    absoluteChange,
-    percentChange,
-    change24h: absoluteChange,
+    currentScore: null,
+    overallScore: null,
+    publicationStatus: "insufficient_data",
+    weightedCoverage: 0,
+    structuralScore: null,
+    dynamicScore: null,
+    baseOri: null,
+    eventAdjustment: 0,
+    previousScore: null,
+    absoluteChange: null,
+    percentChange: null,
+    change24h: null,
     change7d: null,
     change30d: null,
-    grade,
-    riskTier: getRiskTier(current),
-    note: getORINote(current, percentChange, grade),
-    color: getColor(current),
+    grade: "Insufficient Data",
+    riskTier: "Insufficient Data",
+    note: "Live Methodology v1.0 evidence was unavailable. No substitute score is published.",
+    color: "#71717a",
     methodologyVersion: ORI_METHODOLOGY_VERSION,
     calculationType: "live",
     categoryScores: [],
@@ -244,7 +230,8 @@ function deriveFromRaw(symbol: string, raw: TokenRawMetrics): ORIResult {
     dataConfidence: fallbackDataConfidence(),
     dataSources: [],
     underlyingMetrics: EMPTY_UNDERLYING_METRICS,
-    history,
+    evidence: [],
+    history: [],
     lastUpdated: new Date().toISOString(),
     dataSource: "fallback",
     refreshStatus: "stale",
@@ -653,7 +640,11 @@ export async function getLiveTokenDetail(symbol: string) {
 export async function getLiveMarketOverview() {
   try {
     const tokens = await getAllLiveTokenMetrics();
-    const avgOri = tokens.reduce((s, t) => s + t.oriScore, 0) / tokens.length;
+    const published = tokens.filter((t) => t.oriScore != null);
+    const avgOri =
+      published.length > 0
+        ? published.reduce((s, t) => s + (t.oriScore as number), 0) / published.length
+        : 0;
     const ctx = await getLiveContext();
 
     return {

@@ -6,7 +6,6 @@
  * resolve through here so no two surfaces can disagree.
  */
 import "server-only";
-import { PREVIOUS_ORI_SCORES } from "@/data/tokens";
 import { computeOriForSymbol } from "@/lib/data/oriAggregator";
 import type { OriLookupResult } from "@/lib/data/types";
 import { resolveToken, getAllTokenIds } from "./tokenMap";
@@ -16,12 +15,10 @@ import { computeOriForDynamicEntry } from "@/lib/data/oriAggregator";
 import {
   getColor,
   getGrade,
-  getORIChange,
   getORINote,
   getRiskTier,
   roundScore,
 } from "./grade";
-import { buildHistory, previousScoreFromHistory } from "./history";
 import { buildFallbackFromIdentity, buildFallbackResult } from "./fallback";
 import { ORI_METHODOLOGY_VERSION } from "./methodology";
 import {
@@ -52,18 +49,18 @@ export function deriveORIResult(
   identity: TokenIdentity,
   lookup: OriLookupResult
 ): ORIResult {
-  const { symbol } = identity;
-  const current = roundScore(lookup.oriScore);
+  const published = lookup.publicationStatus === "published" && lookup.oriScore != null;
+  const current = published ? roundScore(lookup.oriScore as number) : null;
 
-  // History is built first from a long-term baseline anchor and is forced to
-  // end at the current score. The 24h change is then derived from the most
-  // recent historical datapoint BEFORE today — so the displayed change, the
-  // note, and the chart's last segment are always the same numbers.
-  const baselineAnchor = PREVIOUS_ORI_SCORES[symbol] ?? current;
-  const history = buildHistory(symbol, current, baselineAnchor);
-  const previous = previousScoreFromHistory(history);
-  const { absoluteChange, percentChange } = getORIChange(current, previous);
-  const grade = getGrade(current);
+  // Observed history comes only from persisted snapshots. Do not generate
+  // a synthetic series or fabricate 24h change from PREVIOUS_ORI_SCORES.
+  const history: ORIResult["history"] = [];
+  const previous = null;
+  const { absoluteChange, percentChange } = {
+    absoluteChange: null,
+    percentChange: null,
+  };
+  const grade = current != null ? getGrade(current) : "Insufficient Data";
   const categoryScores = buildCategoryScores(lookup);
 
   return {
@@ -71,6 +68,12 @@ export function deriveORIResult(
     assetId: identity.tokenId,
     currentScore: current,
     overallScore: current,
+    publicationStatus: lookup.publicationStatus,
+    weightedCoverage: lookup.weightedCoverage ?? 0,
+    structuralScore: lookup.structuralScore,
+    dynamicScore: lookup.dynamicScore,
+    baseOri: lookup.baseOri,
+    eventAdjustment: lookup.eventAdjustment,
     previousScore: previous,
     absoluteChange,
     percentChange,
@@ -79,9 +82,12 @@ export function deriveORIResult(
     change7d: null,
     change30d: null,
     grade,
-    riskTier: getRiskTier(current),
-    note: getORINote(current, percentChange, grade),
-    color: getColor(current),
+    riskTier: current != null ? getRiskTier(current) : "Insufficient Data",
+    note:
+      current != null
+        ? getORINote(current, percentChange, grade)
+        : "Weighted coverage is below 60%. Methodology v1.0 does not publish a precise ORI.",
+    color: current != null ? getColor(current) : "#71717a",
     methodologyVersion: ORI_METHODOLOGY_VERSION,
     calculationType: "live",
     categoryScores,
@@ -89,6 +95,7 @@ export function deriveORIResult(
     dataConfidence: buildDataConfidence(lookup),
     dataSources: buildDataSources(lookup),
     underlyingMetrics: buildUnderlyingMetrics(lookup),
+    evidence: lookup.evidence,
     history,
     lastUpdated: lookup.computedAt ?? new Date().toISOString(),
     dataSource: mapDataSource(lookup.dataMode),
@@ -188,15 +195,12 @@ async function buildOverviewORIResult(
     coingeckoId: token.coingeckoId,
     reason: "overview-dynamic",
   });
-  return buildFallbackFromIdentity(
-    {
-      tokenId: token.coingeckoId,
-      symbol: token.symbol,
-      name: token.name,
-      chain: token.chain,
-    },
-    token.marketCapRank
-  );
+  return buildFallbackFromIdentity({
+    tokenId: token.coingeckoId,
+    symbol: token.symbol,
+    name: token.name,
+    chain: token.chain,
+  });
 }
 
 /**

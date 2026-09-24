@@ -77,7 +77,7 @@ function rowFromResult(
     chain: result.chain ?? null,
     snapshot_date: snapshotDate,
     observed_at: result.lastUpdated,
-    overall_ori: result.overallScore,
+    overall_ori: result.overallScore ?? 0,
     grade: result.grade,
     category_scores: result.categoryScores,
     score_drivers: result.scoreDrivers,
@@ -87,6 +87,12 @@ function rowFromResult(
     source_metadata: {
       dataSource: result.dataSource,
       refreshStatus: result.refreshStatus,
+      publicationStatus: result.publicationStatus,
+      structuralScore: result.structuralScore,
+      dynamicScore: result.dynamicScore,
+      baseOri: result.baseOri,
+      eventAdjustment: result.eventAdjustment,
+      evidence: result.evidence ?? [],
     },
     methodology_version: result.methodologyVersion || ORI_METHODOLOGY_VERSION,
     calculation_type: calculationType,
@@ -102,6 +108,16 @@ export async function persistOriSnapshot(
   calculationType: SnapshotCalculationType = "observed",
   snapshotDate = utcDateString()
 ): Promise<SnapshotWriteResult> {
+  if (result.publicationStatus === "insufficient_data" || result.overallScore == null) {
+    return {
+      assetKey: result.assetId,
+      symbol: result.symbol,
+      snapshotDate,
+      status: "skipped",
+      reason: "insufficient-data",
+    };
+  }
+
   if (!snapshotsAvailable()) {
     return {
       assetKey: result.assetId,

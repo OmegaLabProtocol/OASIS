@@ -94,7 +94,7 @@ export async function buildAnalystContext(
   const detail = await getLiveTokenDetail(token.detailKey);
   if (detail) {
     const m = detail.metrics;
-    (base.context.ori as Record<string, unknown>).change7d = m.change7d ?? null;
+    // Do not overwrite ORIResult.change7d with OriMetrics placeholders.
     base.context.legacyComponents = {
       liquidityStability: m.liquidityStability,
       marketIntegrity: m.marketIntegrity,

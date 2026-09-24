@@ -19,8 +19,8 @@ export function TokenScorePanel({
   badgeClassName,
 }: {
   symbol: string;
-  score: number;
-  label: RiskLabel;
+  score: number | null;
+  label: RiskLabel | "Insufficient Data";
   initial?: ORIResult;
   badgeClassName?: string;
 }) {

@@ -86,6 +86,12 @@ function mapInvestorEvent(
     if (page === "/methodology" || page.startsWith("/methodology/")) {
       return "investor_methodology_viewed";
     }
+    if (page === "/screener" || page.startsWith("/screener/")) {
+      return "investor_screener_used";
+    }
+    if (page === "/portfolios" || page.startsWith("/portfolios/")) {
+      return "investor_portfolio_analyzed";
+    }
   }
   return null;
 }

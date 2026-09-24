@@ -15,9 +15,11 @@ export type AccessKind = "admin" | "beta" | "investor" | "none";
  * Linked Auth users keep access after the invite cookie expires.
  */
 export async function resolveAppAccess(): Promise<AccessKind> {
-  if (await isAdmin()) return "admin";
+  // Real beta sessions keep the normal product chrome. An Investor Preview
+  // cookie must still win over a local/admin bypass so preview context persists.
   if (await isBetaSessionValid()) return "beta";
   if (await getInvestorSession()) return "investor";
+  if (await isAdmin()) return "admin";
   const authUser = await getCurrentAuthUser();
   if (authUser && !authUser.isDevBypass) {
     if (await hasLinkedBetaIdentity(authUser.id)) return "beta";

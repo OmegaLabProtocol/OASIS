@@ -141,16 +141,17 @@ async function computeWithFallbacks(
 
   logEnrichment(entry, rawData, fallback.mockCategories);
 
+  // Score live provider evidence only. Mock-filled fields must not become a
+  // published Methodology v1.0 ORI. Fallback metadata is retained for disclosure.
   return computeOriFromNormalizedData(
     entry,
     chain,
     address,
-    fallback.data,
+    fallback.rawData,
     {
       mockUsage: fallback.mockUsage,
       mockCategories: fallback.mockCategories,
       missingLiveDataFields: fallback.missingLiveDataFields,
-      categoryProvenance: fallback.categoryProvenance,
       rawData: fallback.rawData,
     }
   );

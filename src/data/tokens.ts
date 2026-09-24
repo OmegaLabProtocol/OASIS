@@ -216,8 +216,9 @@ export const PREVIOUS_ORI_SCORES: Record<string, number> = {
   OP: 68,
 };
 
-export function getPrimaryRiskDriver(symbol: string): string {
-  return RISK_CHANGE_ATTRIBUTION[symbol.toUpperCase()]?.[0] ?? "Volatility spike";
+/** Legacy static mapping — not Methodology v1.0 evidence. Do not use on published ORI surfaces. */
+export function getPrimaryRiskDriver(_symbol: string): string | null {
+  return null;
 }
 
 /** Centralized 7-day ORI change reference (display-only supplementary metric). */
@@ -230,8 +231,9 @@ export const ORI_CHANGE_7D: Record<string, number> = {
   OP: -3.5,
 };
 
-export function get7dChange(symbol: string): number {
-  return ORI_CHANGE_7D[symbol.toUpperCase()] ?? 0;
+/** Legacy static 7d map — not Methodology v1.0 evidence. Unknown change is null, never 0. */
+export function get7dChange(_symbol: string): number | null {
+  return null;
 }
 
 export const RISK_CHANGE_ATTRIBUTION: Record<string, string[]> = {

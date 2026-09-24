@@ -79,45 +79,38 @@ export function extractAssetContext(
   };
 }
 
-/** Institutional maturity estimates for mock-filled categories */
+/** Institutional maturity estimates for mock-filled categories (not used for published v1.0 ORI). */
 export function getMockCategoryEstimates(tier: AssetTier): OriCategoryScores {
+  const row = (
+    tokenomics: number,
+    ownership: number,
+    governance: number,
+    resilience: number,
+    institutional: number,
+    market: number,
+    liquidity: number,
+    onChain: number,
+    protocol: number
+  ): OriCategoryScores => ({
+    tokenomics,
+    ownership,
+    governance,
+    resilience,
+    institutional,
+    market,
+    liquidity,
+    onChain,
+    protocol,
+  });
   switch (tier) {
     case 1:
-      return {
-        marketLiquidity: 93,
-        protocolFundamentals: 91,
-        holderDistribution: 88,
-        governance: 86,
-        developerActivity: 94,
-        supplyRisk: 89,
-      };
+      return row(89, 88, 86, 94, 93, 93, 93, 88, 91);
     case 2:
-      return {
-        marketLiquidity: 82,
-        protocolFundamentals: 79,
-        holderDistribution: 76,
-        governance: 74,
-        developerActivity: 83,
-        supplyRisk: 77,
-      };
+      return row(77, 76, 74, 83, 82, 82, 82, 76, 79);
     case 3:
-      return {
-        marketLiquidity: 68,
-        protocolFundamentals: 64,
-        holderDistribution: 62,
-        governance: 60,
-        developerActivity: 66,
-        supplyRisk: 63,
-      };
+      return row(63, 62, 60, 66, 68, 68, 68, 62, 64);
     case 4:
-      return {
-        marketLiquidity: 48,
-        protocolFundamentals: 42,
-        holderDistribution: 40,
-        governance: 38,
-        developerActivity: 45,
-        supplyRisk: 41,
-      };
+      return row(41, 40, 38, 45, 48, 48, 48, 40, 42);
   }
 }
 

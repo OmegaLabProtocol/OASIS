@@ -6,7 +6,7 @@ import { OriChange24h } from "@/components/OriChange24h";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAssetOverviewORI } from "@/hooks/useAssetOverviewOri";
-import { getPrimaryRiskDriver } from "@/data/tokens";
+import { derivePrimaryRiskDriver } from "@/lib/ori/enrich";
 import type { ORIResult } from "@/lib/ori/types";
 
 export function DashboardOriOverview({
@@ -55,18 +55,24 @@ export function DashboardOriOverview({
               >
                 <span className="font-medium">{r.symbol}</span>
                 <span className="font-mono text-right tabular-nums">
-                  {r.currentScore}
+                  {r.currentScore ?? "—"}
                 </span>
-                <OriChange24h
-                  change={r.percentChange ?? 0}
-                  className="text-right"
-                  decimals={1}
-                />
+                {r.percentChange == null ? (
+                  <span className="text-right text-xs text-muted-foreground">—</span>
+                ) : (
+                  <OriChange24h
+                    change={r.percentChange}
+                    className="text-right"
+                    decimals={1}
+                  />
+                )}
                 <Badge
                   variant="outline"
                   className="w-full min-w-0 justify-center truncate text-[9px]"
                 >
-                  {getPrimaryRiskDriver(r.symbol)}
+                  {r.publicationStatus === "published"
+                    ? derivePrimaryRiskDriver(r.categoryScores) ?? "—"
+                    : "—"}
                 </Badge>
               </Link>
             ))}

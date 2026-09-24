@@ -25,11 +25,15 @@ export function OriScoreCard({ result }: { result: ORIResult }) {
             </div>
             <div className="flex min-w-0 flex-1 flex-col items-stretch gap-1">
               <RiskBadge label={result.grade as RiskLabel} score={result.currentScore} />
-              <OriChange24h
-                change={result.percentChange ?? 0}
-                className="text-right"
-                decimals={1}
-              />
+              {result.percentChange == null ? (
+                <span className="text-right text-xs text-muted-foreground">—</span>
+              ) : (
+                <OriChange24h
+                  change={result.percentChange}
+                  className="text-right"
+                  decimals={1}
+                />
+              )}
             </div>
           </div>
           <p className="line-clamp-2 min-w-0 text-[10px] leading-snug text-muted-foreground">

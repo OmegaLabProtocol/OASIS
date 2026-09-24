@@ -11,8 +11,8 @@ import { DISCLAIMER } from "@/lib/constants";
 
 interface RiskBriefProps {
   asset: string;
-  oriScore: number;
-  riskLabel: RiskLabel;
+  oriScore: number | null;
+  riskLabel: RiskLabel | "Insufficient Data";
   strengths: string[];
   risks: string[];
   liquiditySummary: string;
