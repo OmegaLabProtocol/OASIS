@@ -6,19 +6,36 @@ import {
   INTELLIGENCE_REPORT_SYSTEM_PROMPT,
 } from "@/lib/intelligenceReport";
 import type { GenerateReportPayload, GenerateReportResponse } from "@/lib/types";
+import { getCurrentAdmin } from "@/lib/admin/requireAdmin";
+import { getBetaSession } from "@/lib/beta/authorization";
+import { getInvestorSession } from "@/lib/investor/authorization";
+import {
+  MAX_REPORT_BODY_BYTES,
+  MAX_REPORT_OUTPUT_TOKENS,
+  resolveReportAccess,
+  validateReportBody,
+} from "@/lib/reports/access";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
-function isValidPayload(body: unknown): body is GenerateReportPayload {
-  if (!body || typeof body !== "object") return false;
-  const payload = body as GenerateReportPayload;
-  return (
-    typeof payload.metrics?.symbol === "string" &&
-    typeof payload.metrics?.oriScore === "number" &&
-    typeof payload.raw?.symbol === "string" &&
-    typeof payload.components === "object" &&
-    payload.components !== null
-  );
+/**
+ * Report generation is gated to authorized product sessions (admin, activated
+ * beta, or investor preview). Session resolution reads signed cookies; the
+ * same-origin client fetch forwards them automatically, so authorized users are
+ * unaffected while anonymous callers are rejected before any work is done.
+ */
+async function hasReportAccess(): Promise<boolean> {
+  const [admin, beta, investor] = await Promise.all([
+    getCurrentAdmin(),
+    getBetaSession(),
+    getInvestorSession(),
+  ]);
+  return resolveReportAccess({
+    isAdmin: Boolean(admin),
+    hasBeta: Boolean(beta),
+    hasInvestor: Boolean(investor),
+  });
 }
 
 async function generateOpenAIReport(
@@ -32,6 +49,9 @@ async function generateOpenAIReport(
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     temperature: 0.3,
+    // Bound output token consumption so a single request cannot run up
+    // unbounded OpenAI cost.
+    max_tokens: MAX_REPORT_OUTPUT_TOKENS,
     messages: [
       { role: "system", content: INTELLIGENCE_REPORT_SYSTEM_PROMPT },
       {
@@ -46,15 +66,33 @@ async function generateOpenAIReport(
 }
 
 export async function POST(request: Request) {
-  try {
-    const body: unknown = await request.json();
+  // 1. Authentication/authorization: reject anonymous callers up front.
+  if (!(await hasReportAccess())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-    if (!isValidPayload(body)) {
+  // 2. Reject oversized bodies early via the declared Content-Length when
+  //    present (defense-in-depth; the parsed body is also size-checked below).
+  const declaredLength = Number(request.headers.get("content-length") ?? 0);
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_REPORT_BODY_BYTES) {
+    return NextResponse.json(
+      { error: "Request body too large" },
+      { status: 413 }
+    );
+  }
+
+  try {
+    // 3. Read + validate the body (size cap, safe JSON parse, strict shape).
+    const text = await request.text();
+    const validation = validateReportBody(text);
+    if (!validation.ok) {
       return NextResponse.json(
-        { error: "Invalid report payload" },
-        { status: 400 }
+        { error: validation.error },
+        { status: validation.status }
       );
     }
+
+    const body = validation.payload;
 
     let report: string | null = null;
     let source: GenerateReportResponse["source"] = "demo";
